@@ -29,11 +29,11 @@ export default function PokemonCard({ pokemon, score, isFixed, onClick }: Pokemo
   return (
     <div
       onClick={onClick}
-      className={`relative bg-white dark:bg-slate-800 border rounded-xl p-4
+      className={`relative bg-white border rounded-xl p-4
         hover:shadow-sm transition-all duration-200
         ${isFixed
-          ? 'border-amber-400 dark:border-amber-500 ring-1 ring-amber-200 dark:ring-amber-800'
-          : 'border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-500'
+          ? 'border-amber-400 ring-1 ring-amber-200'
+          : 'border-slate-200 hover:border-indigo-300'
         }
         ${onClick ? 'cursor-pointer' : ''}`}
     >
@@ -57,7 +57,7 @@ export default function PokemonCard({ pokemon, score, isFixed, onClick }: Pokemo
       </div>
 
       {/* 이름 + 번호 */}
-      <h3 className="text-center font-bold text-slate-900 dark:text-slate-100 text-lg">
+      <h3 className="text-center font-bold text-slate-900 text-lg">
         {pokemon.name}
       </h3>
       <p className="text-center text-slate-400 text-sm">
@@ -72,18 +72,18 @@ export default function PokemonCard({ pokemon, score, isFixed, onClick }: Pokemo
       </div>
 
       {/* 역할 */}
-      <p className="text-center text-indigo-600 dark:text-indigo-400 text-xs font-medium mt-2">
+      <p className="text-center text-indigo-600 text-xs font-medium mt-2">
         {pokemon.role}
       </p>
 
       {/* 추천 점수 + 세부 점수 (score가 있을 때만) */}
       {score && totalScore !== null && (
-        <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
+        <div className="mt-3 pt-3 border-t border-slate-100">
           <div className="flex items-center justify-center gap-1.5 mb-2">
             <span className="text-orange-500 font-bold text-lg">{totalScore}</span>
             <span className="text-slate-400 text-xs">/ 100</span>
           </div>
-          <div className="space-y-1 text-[11px] text-slate-500 dark:text-slate-400">
+          <div className="space-y-1 text-[11px] text-slate-500">
             <div className="flex justify-between">
               <span>타입 커버리지</span>
               <span className="font-medium">{score.typeCoverage}</span>

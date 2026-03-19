@@ -146,26 +146,26 @@ export default function AnalyzePage() {
     : 0;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-screen bg-slate-50">
       <div className="max-w-5xl mx-auto px-4 py-8 sm:py-12">
         {/* 페이지 헤더 */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-slate-100">
+          <h1 className="text-3xl sm:text-4xl font-bold text-slate-900">
             파티 분석
           </h1>
-          <p className="mt-2 text-slate-500 dark:text-slate-400">
+          <p className="mt-2 text-slate-500">
             포켓몬을 선택하고 파티의 타입 커버리지와 밸런스를 분석해보세요.
           </p>
         </div>
 
         {/* 파티 선택 영역 */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 mb-8">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
+          <h2 className="text-lg font-semibold text-slate-900 mb-4">
             파티 구성
           </h2>
 
           {pokemonError && (
-            <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm">
+            <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
               {pokemonError}
             </div>
           )}
@@ -217,7 +217,7 @@ export default function AnalyzePage() {
 
         {/* 분석 에러 */}
         {analyzeError && (
-          <div className="mb-8 p-4 rounded-xl bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm flex items-center gap-2">
+          <div className="mb-8 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 shrink-0" />
             {analyzeError}
           </div>
@@ -227,8 +227,8 @@ export default function AnalyzePage() {
         {analysis && (
           <div className="space-y-6">
             {/* 종합 점수 */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+              <h2 className="text-lg font-semibold text-slate-900 mb-4">
                 종합 점수
               </h2>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-6 sm:gap-12">
@@ -237,7 +237,7 @@ export default function AnalyzePage() {
                   <div className={`text-6xl font-bold ${getScoreColor(totalScore)}`}>
                     {totalScore}
                   </div>
-                  <div className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  <div className="text-sm text-slate-500 mt-1">
                     종합 ({getScoreLabel(totalScore)})
                   </div>
                 </div>
@@ -247,7 +247,7 @@ export default function AnalyzePage() {
                     <div className={`text-3xl font-bold ${getScoreColor(analysis.coverageScore)}`}>
                       {analysis.coverageScore}
                     </div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    <div className="text-xs text-slate-500 mt-1">
                       커버리지
                     </div>
                   </div>
@@ -255,7 +255,7 @@ export default function AnalyzePage() {
                     <div className={`text-3xl font-bold ${getScoreColor(analysis.balanceScore)}`}>
                       {analysis.balanceScore}
                     </div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    <div className="text-xs text-slate-500 mt-1">
                       밸런스
                     </div>
                   </div>
@@ -264,11 +264,11 @@ export default function AnalyzePage() {
             </div>
 
             {/* 타입 커버리지 레이더 차트 */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+              <h2 className="text-lg font-semibold text-slate-900 mb-4">
                 타입 방어 매치업
               </h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+              <p className="text-sm text-slate-500 mb-4">
                 1.0 이상일수록 해당 타입에 취약하고, 1.0 미만일수록 내성이 있습니다.
               </p>
               <div className="w-full h-[400px] sm:h-[450px]">
@@ -316,26 +316,26 @@ export default function AnalyzePage() {
             {/* 약점 / 내성 목록 */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {/* 약점 */}
-              <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <Shield className="w-5 h-5 text-red-500" />
-                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  <h2 className="text-lg font-semibold text-slate-900">
                     약점 타입
                   </h2>
                 </div>
                 {analysis.weaknesses.length > 0 ? (
-                  <div className="bg-red-50 dark:bg-red-950/30 rounded-xl p-4">
+                  <div className="bg-red-50 rounded-xl p-4">
                     <div className="flex flex-wrap gap-2">
                       {analysis.weaknesses.map((type) => (
                         <div key={type} className="flex items-center gap-1.5">
                           <TypeBadge type={type} size="lg" />
-                          <span className="text-xs text-red-600 dark:text-red-400 font-medium">
+                          <span className="text-xs text-red-600 font-medium">
                             {analysis.typeMatchups[type]?.toFixed(1)}x
                           </span>
                         </div>
                       ))}
                     </div>
-                    <p className="mt-3 text-xs text-red-500 dark:text-red-400">
+                    <p className="mt-3 text-xs text-red-500">
                       파티의 절반 이상이 이 타입에 약점을 가지고 있습니다.
                     </p>
                   </div>
@@ -347,26 +347,26 @@ export default function AnalyzePage() {
               </div>
 
               {/* 내성 */}
-              <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <Shield className="w-5 h-5 text-blue-500" />
-                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  <h2 className="text-lg font-semibold text-slate-900">
                     내성 타입
                   </h2>
                 </div>
                 {analysis.resistances.length > 0 ? (
-                  <div className="bg-blue-50 dark:bg-blue-950/30 rounded-xl p-4">
+                  <div className="bg-blue-50 rounded-xl p-4">
                     <div className="flex flex-wrap gap-2">
                       {analysis.resistances.map((type) => (
                         <div key={type} className="flex items-center gap-1.5">
                           <TypeBadge type={type} size="lg" />
-                          <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                          <span className="text-xs text-blue-600 font-medium">
                             {analysis.typeMatchups[type]?.toFixed(1)}x
                           </span>
                         </div>
                       ))}
                     </div>
-                    <p className="mt-3 text-xs text-blue-500 dark:text-blue-400">
+                    <p className="mt-3 text-xs text-blue-500">
                       파티의 절반 이상이 이 타입에 내성을 가지고 있습니다.
                     </p>
                   </div>
@@ -379,14 +379,14 @@ export default function AnalyzePage() {
             </div>
 
             {/* 공격 커버리지 */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Swords className="w-5 h-5 text-indigo-500" />
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                <h2 className="text-lg font-semibold text-slate-900">
                   공격 커버리지
                 </h2>
               </div>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+              <p className="text-sm text-slate-500 mb-4">
                 파티가 효과적으로 공격할 수 있는 타입 ({analysis.coverage.length}/{ALL_TYPES.length})
               </p>
               <div className="flex flex-wrap gap-2">

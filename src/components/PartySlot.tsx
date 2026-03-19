@@ -17,9 +17,9 @@ export default function PartySlot({ pokemon, slotNumber, onRemove, onAdd }: Part
     return (
       <div
         onClick={onAdd}
-        className={`w-24 h-24 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-600
+        className={`w-24 h-24 rounded-xl border-2 border-dashed border-slate-300
           flex flex-col items-center justify-center gap-1
-          hover:border-indigo-400 hover:bg-indigo-50 dark:hover:border-indigo-500 dark:hover:bg-indigo-950
+          hover:border-indigo-400 hover:bg-indigo-50
           transition-colors duration-200
           ${onAdd ? 'cursor-pointer' : ''}
           focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2`}
@@ -33,8 +33,8 @@ export default function PartySlot({ pokemon, slotNumber, onRemove, onAdd }: Part
         }}
         aria-label={`슬롯 ${slotNumber}: 포켓몬 추가`}
       >
-        <Plus className="w-8 h-8 text-slate-300 dark:text-slate-500" />
-        <span className="text-[10px] text-slate-400 dark:text-slate-500">포켓몬 추가</span>
+        <Plus className="w-8 h-8 text-slate-300" />
+        <span className="text-[10px] text-slate-400">포켓몬 추가</span>
       </div>
     );
   }
@@ -43,7 +43,7 @@ export default function PartySlot({ pokemon, slotNumber, onRemove, onAdd }: Part
 
   return (
     <div
-      className="relative w-24 h-24 rounded-xl border-2 border-indigo-500 bg-indigo-50 dark:bg-indigo-950
+      className="relative w-24 h-24 rounded-xl border-2 border-indigo-500 bg-indigo-50
         flex flex-col items-center justify-center p-2
         transition-all duration-200"
     >
@@ -75,7 +75,7 @@ export default function PartySlot({ pokemon, slotNumber, onRemove, onAdd }: Part
       />
 
       {/* 이름 */}
-      <span className="text-xs font-medium text-slate-700 dark:text-slate-200 mt-0.5 truncate max-w-full">
+      <span className="text-xs font-medium text-slate-700 mt-0.5 truncate max-w-full">
         {pokemon.name}
       </span>
 

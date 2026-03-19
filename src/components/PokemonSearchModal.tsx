@@ -44,17 +44,17 @@ export default function PokemonSearchModal({
       onClick={onClose}
     >
       <div
-        className="bg-white dark:bg-slate-900 rounded-2xl shadow-lg max-w-2xl w-full max-h-[80vh] flex flex-col"
+        className="bg-white rounded-2xl shadow-lg max-w-2xl w-full max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 헤더 */}
-        <div className="flex items-center justify-between p-6 pb-4 border-b border-slate-200 dark:border-slate-700">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+        <div className="flex items-center justify-between p-6 pb-4 border-b border-slate-200">
+          <h2 className="text-xl font-bold text-slate-900">
             포켓몬 선택
           </h2>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
             aria-label="닫기"
           >
             <X className="w-5 h-5" />
@@ -62,7 +62,7 @@ export default function PokemonSearchModal({
         </div>
 
         {/* 검색 필터 */}
-        <div className="px-6 py-4 space-y-3 border-b border-slate-100 dark:border-slate-800">
+        <div className="px-6 py-4 space-y-3 border-b border-slate-100">
           {/* 이름 검색 */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -72,8 +72,8 @@ export default function PokemonSearchModal({
               value={searchName}
               onChange={(e) => setSearchName(e.target.value)}
               className="w-full pl-10 pr-4 py-3 rounded-lg
-                border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800
-                text-slate-900 dark:text-slate-100
+                border border-slate-200 bg-white
+                text-slate-900
                 placeholder:text-slate-400
                 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none
                 transition-colors duration-200 text-base"
@@ -89,7 +89,7 @@ export default function PokemonSearchModal({
                 ${
                   selectedType === null
                     ? 'bg-indigo-600 text-white'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
             >
               전체
@@ -136,7 +136,7 @@ export default function PokemonSearchModal({
         </div>
 
         {/* 하단 정보 */}
-        <div className="px-6 py-3 border-t border-slate-100 dark:border-slate-800 text-center">
+        <div className="px-6 py-3 border-t border-slate-100 text-center">
           <span className="text-slate-400 text-sm">
             {filteredPokemon.length}마리 표시 중
           </span>

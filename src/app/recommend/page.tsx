@@ -193,25 +193,25 @@ export default function RecommendPage() {
   const fixedPokemonList = fixedPokemon.filter((p): p is Pokemon => p !== undefined);
 
   return (
-    <div className="py-8">
-      <h1 className="text-3xl font-extrabold text-center text-slate-900 dark:text-white mb-2">
+    <div className="min-h-screen py-8">
+      <h1 className="text-3xl font-extrabold text-center text-slate-900 mb-2">
         파티 추천
       </h1>
-      <p className="text-center text-slate-500 dark:text-slate-400 mb-8">
+      <p className="text-center text-slate-500 mb-8">
         체육관에 맞는 최적의 파티를 추천받으세요.
       </p>
 
-      <StepIndicator steps={STEPS} currentStep={currentStep} />
+      <StepIndicator steps={STEPS} currentStep={currentStep} onStepClick={setCurrentStep} />
 
       <div className="mt-8">
         {/* ===== Step 1: 게임 타이틀 선택 ===== */}
         {currentStep === 1 && (
           <div>
-            <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-4">
+            <h2 className="text-xl font-bold text-slate-800 mb-4">
               어떤 게임을 플레이하시나요?
             </h2>
-            <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">
-              플레이 중인 게임 타이틀을 선택하세요.
+            <p className="text-slate-500 text-sm mb-6">
+              플레이 중인 게임 타이틀을 선택해주세요.
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-3xl mx-auto">
@@ -221,24 +221,22 @@ export default function RecommendPage() {
                   onClick={() => !game.disabled && setSelectedGameId(game.id)}
                   disabled={!!game.disabled}
                   className={`relative flex flex-col items-center gap-3 p-6 rounded-xl border-2 transition-all duration-200
-                    ${
-                      game.disabled
-                        ? 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 opacity-50 cursor-not-allowed'
-                        : selectedGameId === game.id
-                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950 shadow-md'
-                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-indigo-300 dark:hover:border-indigo-600 cursor-pointer'
+                    ${game.disabled
+                      ? 'border-slate-200 bg-slate-50 opacity-50 cursor-not-allowed'
+                      : selectedGameId === game.id
+                        ? 'border-indigo-500 bg-indigo-50 shadow-md'
+                        : 'border-slate-200 bg-white hover:border-indigo-300 cursor-pointer'
                     }`}
                 >
                   <span className="text-3xl">{game.icon}</span>
-                  <span className={`font-bold text-lg ${
-                    selectedGameId === game.id
-                      ? 'text-indigo-600 dark:text-indigo-400'
-                      : 'text-slate-800 dark:text-slate-200'
-                  }`}>
+                  <span className={`font-bold text-lg ${selectedGameId === game.id
+                    ? 'text-indigo-600'
+                    : 'text-slate-800'
+                    }`}>
                     {game.label}
                   </span>
                   {game.disabled && (
-                    <span className="text-xs text-slate-400 dark:text-slate-500">
+                    <span className="text-xs text-slate-400">
                       준비 중
                     </span>
                   )}
@@ -258,11 +256,11 @@ export default function RecommendPage() {
         {/* ===== Step 2: 스토리 포인트 선택 ===== */}
         {currentStep === 2 && (
           <div>
-            <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-4">
+            <h2 className="text-xl font-bold text-slate-800 mb-4">
               어디까지 진행하셨나요?
             </h2>
-            <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">
-              공략할 체육관을 선택하세요. 해당 시점까지 잡을 수 있는 포켓몬을 기반으로 추천합니다.
+            <p className="text-slate-500 text-sm mb-6">
+              공략할 체육관을 선택해주세요. 해당 시점까지 잡을 수 있는 포켓몬을 기반으로 추천합니다.
             </p>
 
             {storyPointsLoading && (
@@ -273,7 +271,7 @@ export default function RecommendPage() {
             )}
 
             {storyPointsError && (
-              <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-xl p-4 text-red-700 dark:text-red-400">
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700">
                 {storyPointsError}
               </div>
             )}
@@ -291,11 +289,11 @@ export default function RecommendPage() {
         {/* ===== Step 3: 고정 포켓몬 선택 ===== */}
         {currentStep === 3 && (
           <div>
-            <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-4">
+            <h2 className="text-xl font-bold text-slate-800 mb-4">
               이미 키우고 있는 포켓몬이 있나요?
             </h2>
-            <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">
-              고정할 포켓몬을 선택하세요. 나머지 슬롯을 자동으로 추천합니다.
+            <p className="text-slate-500 text-sm mb-6">
+              파티에 포함할 포켓몬을 선택해주세요. 나머지 슬롯을 자동으로 추천합니다.
             </p>
 
             {pokemonLoading && (
@@ -306,7 +304,7 @@ export default function RecommendPage() {
             )}
 
             {pokemonError && (
-              <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-xl p-4 text-red-700 dark:text-red-400 mb-6">
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 mb-6">
                 {pokemonError}
               </div>
             )}
@@ -339,27 +337,27 @@ export default function RecommendPage() {
         {/* ===== Step 4: 추천 결과 ===== */}
         {currentStep === 4 && (
           <div>
-            <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-4">
+            <h2 className="text-xl font-bold text-slate-800 mb-4">
               추천 파티
             </h2>
 
             {recommendLoading && (
               <div className="flex flex-col items-center justify-center py-16">
                 <Loader2 className="w-10 h-10 text-indigo-500 animate-spin mb-4" />
-                <span className="text-slate-500 dark:text-slate-400">
+                <span className="text-slate-500">
                   최적의 파티를 계산하고 있습니다...
                 </span>
               </div>
             )}
 
             {recommendError && (
-              <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-xl p-4 text-red-700 dark:text-red-400">
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700">
                 {recommendError}
               </div>
             )}
 
             {!recommendLoading && !recommendError && recommendations.length === 0 && fixedPokemonList.length === 0 && (
-              <div className="text-center py-16 text-slate-400 dark:text-slate-500">
+              <div className="text-center py-16 text-slate-400">
                 추천 결과가 없습니다. 다른 스토리 포인트를 선택해보세요.
               </div>
             )}
@@ -390,14 +388,14 @@ export default function RecommendPage() {
       </div>
 
       {/* 네비게이션 버튼 */}
-      <div className="flex items-center justify-between mt-12 pt-6 border-t border-slate-200 dark:border-slate-700">
+      <div className="flex items-center justify-between mt-12 pt-6 border-t border-slate-200">
         <button
           onClick={goPrev}
           disabled={currentStep === 1}
           className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl
-            text-slate-600 dark:text-slate-400 font-medium
-            border border-slate-300 dark:border-slate-600
-            hover:border-slate-400 hover:text-slate-800 dark:hover:border-slate-500 dark:hover:text-slate-200
+            text-slate-600 font-medium
+            border border-slate-300
+            hover:border-slate-400 hover:text-slate-800
             disabled:opacity-40 disabled:cursor-not-allowed
             transition-colors duration-200 cursor-pointer
             focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
@@ -411,8 +409,8 @@ export default function RecommendPage() {
             <button
               onClick={goNext}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl
-                text-slate-500 dark:text-slate-400 font-medium
-                hover:text-indigo-600 dark:hover:text-indigo-400
+                text-slate-500 font-medium
+                hover:text-indigo-600
                 transition-colors duration-200 cursor-pointer
                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
             >

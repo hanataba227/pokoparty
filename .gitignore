@@ -1,7 +1,6 @@
 # Project specific
 .claude/
 .kkirikkiri
-__tests__/
 
 # Backend data
 backend/data/
