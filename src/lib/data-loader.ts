@@ -14,11 +14,11 @@ import type {
   Move,
   BaseStats,
   ExpGroup,
-  PokemonRole,
   StoryPointType,
   EncounterMethod,
   EncounterRarity,
 } from "@/types/pokemon";
+import { classifyRoleFromStats } from "@/lib/roles";
 
 // ========================================
 // 영어 → 한국어 타입 매핑
@@ -50,7 +50,10 @@ const TYPE_EN_TO_KO: Record<string, PokemonType> = {
 // ========================================
 
 let pokemonCache: Pokemon[] | null = null;
+let pokemonCacheVersion: string | null = null;
+let pokemonNameEnToIdCache: Map<string, number> | null = null;
 let movesCache: Map<number, Move[]> | null = null;
+let movesCacheVersion: string | null = null;
 let storyPointsCache: StoryPoint[] | null = null;
 let encountersCache: Encounter[] | null = null;
 let gymsCache: Gym[] | null = null;
@@ -84,21 +87,29 @@ function convertTypeToKo(typeEn: string): PokemonType {
 }
 
 // ========================================
-// 역할 분류 (data-loader에서 사용하는 간이 버전)
+// 게임 버전별 JSON 파일 선택
 // ========================================
 
-function classifyRoleFromStats(stats: BaseStats): PokemonRole {
-  if (stats.spe > 100) return "스피드";
-  if (stats.atk > 100 && stats.atk > stats.spa) return "물리어태커";
-  if (stats.spa > 100 && stats.spa > stats.atk) return "특수어태커";
-  if (stats.def > 100 && stats.hp > 80) return "물리탱커";
-  if (stats.spd > 100 && stats.hp > 80) return "특수탱커";
+type GameVersion = "sword" | "shield" | undefined;
 
-  // BST(종족값 합) 기반 올라운더 판정
-  const bst = stats.hp + stats.atk + stats.def + stats.spa + stats.spd + stats.spe;
-  if (bst >= 500) return "올라운더";
-
-  return "서포터";
+/**
+ * gameVersion에 따라 적절한 포켓몬 JSON 파일명 반환
+ * - sword → gen8-sword-pokemon.json
+ * - shield → gen8-shield-pokemon.json
+ * - undefined → gen8-swsh-pokemon.json (폴백)
+ *
+ * 버전별 파일이 없으면 gen8-swsh-pokemon.json로 폴백
+ */
+function getPokemonJsonFilename(gameVersion?: GameVersion): string {
+  if (gameVersion === "sword") {
+    const swordPath = getDataPath("pokemon", "gen8-sword-pokemon.json");
+    if (fs.existsSync(swordPath)) return "gen8-sword-pokemon.json";
+  }
+  if (gameVersion === "shield") {
+    const shieldPath = getDataPath("pokemon", "gen8-shield-pokemon.json");
+    if (fs.existsSync(shieldPath)) return "gen8-shield-pokemon.json";
+  }
+  return "gen8-swsh-pokemon.json";
 }
 
 // ========================================
@@ -137,12 +148,22 @@ interface RawPokemonFile {
 
 /**
  * 포켓몬 데이터 로드
- * gen8-swsh-pokemon.json에서 로드하여 Pokemon[] 형태로 변환
+ * gameVersion에 따라 적절한 JSON 파일에서 로드하여 Pokemon[] 형태로 변환
+ * @param gameVersion - 'sword' | 'shield' | undefined (undefined면 통합 파일)
  */
-export function loadPokemonData(): Pokemon[] {
-  if (pokemonCache) return pokemonCache;
+export function loadPokemonData(gameVersion?: GameVersion): Pokemon[] {
+  const filename = getPokemonJsonFilename(gameVersion);
+  const cacheKey = filename;
 
-  const raw = readJsonFile<RawPokemonFile>("pokemon", "gen8-swsh-pokemon.json");
+  if (pokemonCache && pokemonCacheVersion === cacheKey) return pokemonCache;
+
+  const raw = readJsonFile<RawPokemonFile>("pokemon", filename);
+
+  // name_en -> id 캐시 구축 (loadEncounters에서 재사용)
+  pokemonNameEnToIdCache = new Map();
+  for (const p of raw.pokemon) {
+    if (p.name_en) pokemonNameEnToIdCache.set(p.name_en.toLowerCase(), p.id);
+  }
 
   pokemonCache = raw.pokemon.map((p) => {
     const types = p.types.map(convertTypeToKo);
@@ -170,17 +191,22 @@ export function loadPokemonData(): Pokemon[] {
     return pokemon;
   });
 
+  pokemonCacheVersion = cacheKey;
   return pokemonCache;
 }
 
 /**
  * 포켓몬별 기술 데이터 로드
  * pokemonId -> Move[] 매핑
+ * @param gameVersion - 'sword' | 'shield' | undefined
  */
-export function loadMovesData(): Map<number, Move[]> {
-  if (movesCache) return movesCache;
+export function loadMovesData(gameVersion?: GameVersion): Map<number, Move[]> {
+  const filename = getPokemonJsonFilename(gameVersion);
+  const cacheKey = filename;
 
-  const raw = readJsonFile<RawPokemonFile>("pokemon", "gen8-swsh-pokemon.json");
+  if (movesCache && movesCacheVersion === cacheKey) return movesCache;
+
+  const raw = readJsonFile<RawPokemonFile>("pokemon", filename);
 
   movesCache = new Map();
 
@@ -197,6 +223,7 @@ export function loadMovesData(): Map<number, Move[]> {
     movesCache.set(p.id, moves);
   }
 
+  movesCacheVersion = cacheKey;
   return movesCache;
 }
 
@@ -380,15 +407,11 @@ export function loadEncounters(): Encounter[] {
   if (encountersCache) return encountersCache;
 
   const raw = readJsonFile<RawEncounterFile>("encounter", "gen8-swsh-encounters.json");
-  const pokemonData = loadPokemonData();
+  loadPokemonData(); // 캐시 보장
   const storyData = readJsonFile<RawStoryFile>("story", "gen8-swsh-story-order.json");
-  const pokemonJsonRaw = readJsonFile<RawPokemonFile>("pokemon", "gen8-swsh-pokemon.json");
 
-  // name_en -> pokemon id 매핑
-  const nameToId = new Map<string, number>();
-  for (const p of pokemonJsonRaw.pokemon) {
-    nameToId.set(p.name_en.toLowerCase(), p.id);
-  }
+  // loadPokemonData에서 구축된 name_en -> id 캐시 재사용 (중복 파싱 방지)
+  const nameToId = pokemonNameEnToIdCache ?? new Map<string, number>();
 
   // location_id -> story order 매핑
   const locationToStoryPointId = new Map<string, string>();

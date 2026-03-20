@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { Plus, X } from 'lucide-react';
 import type { Pokemon } from '@/types/pokemon';
+import { getSpriteUrl } from '@/lib/sprite';
 import TypeBadge from './TypeBadge';
 
 interface PartySlotProps {
@@ -17,7 +18,7 @@ export default function PartySlot({ pokemon, slotNumber, onRemove, onAdd }: Part
     return (
       <div
         onClick={onAdd}
-        className={`w-24 h-24 rounded-xl border-2 border-dashed border-slate-300
+        className={`w-28 h-28 rounded-xl border-2 border-dashed border-slate-300
           flex flex-col items-center justify-center gap-1
           hover:border-indigo-400 hover:bg-indigo-50
           transition-colors duration-200
@@ -39,11 +40,11 @@ export default function PartySlot({ pokemon, slotNumber, onRemove, onAdd }: Part
     );
   }
 
-  const spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemon.id}.png`;
+  const spriteUrl = getSpriteUrl(pokemon.id);
 
   return (
     <div
-      className="relative w-24 h-24 rounded-xl border-2 border-indigo-500 bg-indigo-50
+      className="relative w-28 h-28 rounded-xl border-2 border-indigo-500 bg-indigo-50
         flex flex-col items-center justify-center p-2
         transition-all duration-200"
     >

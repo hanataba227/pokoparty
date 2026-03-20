@@ -1,16 +1,39 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { Menu, X, Github } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Menu, X, Github, User, LogOut, ChevronDown } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 const navLinks = [
-  { href: '/recommend', label: '추천' },
-  { href: '/analyze', label: '분석' },
+  { href: '/recommend', label: '파티 추천' },
+  { href: '/analyze', label: '파티 분석' },
 ];
 
 function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const { user, loading, signOut } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setProfileDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSignOut = async () => {
+    setProfileDropdownOpen(false);
+    setMobileMenuOpen(false);
+    await signOut();
+    router.push('/');
+  };
 
   return (
     <nav className="sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-slate-200">
@@ -29,11 +52,66 @@ function Navbar() {
             <Link
               key={link.href}
               href={link.href}
-              className="text-slate-600 hover:text-indigo-600 font-medium transition-colors duration-200 cursor-pointer"
+              className="text-sm text-slate-600 hover:text-indigo-600 font-medium transition-colors duration-200 cursor-pointer"
             >
               {link.label}
             </Link>
           ))}
+
+          {/* Auth Section - Desktop */}
+          {loading ? (
+            <div className="w-20 h-8 bg-slate-100 rounded-lg animate-pulse" />
+          ) : user ? (
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <div className="w-7 h-7 bg-indigo-100 rounded-full flex items-center justify-center">
+                  <User className="w-4 h-4 text-indigo-600" />
+                </div>
+                <span className="text-sm font-medium max-w-[100px] truncate">
+                  {user.user_metadata?.display_name || user.email?.split('@')[0] || '유저'}
+                </span>
+                <ChevronDown className="w-3.5 h-3.5" />
+              </button>
+
+              {profileDropdownOpen && (
+                <div className="absolute right-0 mt-1 w-auto min-w-[120px] bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50">
+                  <Link
+                    href="/mypage"
+                    onClick={() => setProfileDropdownOpen(false)}
+                    className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                  >
+                    <User className="w-4 h-4" />
+                    마이페이지
+                  </Link>
+                  <button
+                    onClick={handleSignOut}
+                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    로그아웃
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Link
+                href="/login"
+                className="px-3 py-1.5 text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors"
+              >
+                로그인
+              </Link>
+              <Link
+                href="/signup"
+                className="px-3 py-1.5 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                회원가입
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* Mobile Hamburger */}
@@ -62,6 +140,53 @@ function Navbar() {
                 {link.label}
               </Link>
             ))}
+
+            <div className="border-t border-slate-200 pt-2 mt-2">
+              {loading ? (
+                <div className="h-8 bg-slate-100 rounded-lg animate-pulse" />
+              ) : user ? (
+                <>
+                  <div className="flex items-center gap-2 py-2 text-sm text-slate-500">
+                    <div className="w-6 h-6 bg-indigo-100 rounded-full flex items-center justify-center">
+                      <User className="w-3.5 h-3.5 text-indigo-600" />
+                    </div>
+                    <span className="truncate">
+                      {user.user_metadata?.display_name || user.email?.split('@')[0] || '유저'}
+                    </span>
+                  </div>
+                  <Link
+                    href="/mypage"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block py-2 text-slate-600 hover:text-indigo-600 font-medium transition-colors cursor-pointer"
+                  >
+                    마이페이지
+                  </Link>
+                  <button
+                    onClick={handleSignOut}
+                    className="block w-full text-left py-2 text-slate-600 hover:text-indigo-600 font-medium transition-colors cursor-pointer"
+                  >
+                    로그아웃
+                  </button>
+                </>
+              ) : (
+                <div className="flex gap-2">
+                  <Link
+                    href="/login"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex-1 py-2 text-center text-sm font-medium text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                  >
+                    로그인
+                  </Link>
+                  <Link
+                    href="/signup"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex-1 py-2 text-center text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                  >
+                    회원가입
+                  </Link>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

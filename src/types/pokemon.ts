@@ -214,6 +214,22 @@ export interface Gym {
 }
 
 // ========================================
+// 추천 필터 옵션
+// ========================================
+
+/** 추천 필터 옵션 */
+export interface RecommendFilters {
+  /** 통신교환 진화 포켓몬 제외 */
+  excludeTradeEvolution?: boolean;
+  /** 도구/돌 진화 포켓몬 제외 */
+  excludeItemEvolution?: boolean;
+  /** 스타팅 포켓몬 포함 */
+  includeStarters?: boolean;
+  /** 게임 버전 */
+  gameVersion?: 'sword' | 'shield';
+}
+
+// ========================================
 // 추천 / 분석 결과 타입
 // ========================================
 
@@ -249,14 +265,29 @@ export interface AnalysisResult {
 
 /** 스코어링 세부 점수 */
 export interface ScoringBreakdown {
-  /** 타입 커버리지 점수 (가중치 0.25) */
+  /** 타입 커버리지 / 전투적합도 점수 */
   typeCoverage: number;
-  /** 등장 시점 점수 (가중치 0.25) */
+  /** 등장 시점 / 입수시기 점수 */
   availability: number;
-  /** 레벨업 속도 점수 (가중치 0.15) */
+  /** 레벨업 속도 / 자속화력 점수 */
   levelUpSpeed: number;
-  /** 기술 습득 점수 (가중치 0.20) */
+  /** 기술 습득 / 기술폭 점수 */
   movePool: number;
-  /** 진화 용이성 점수 (가중치 0.15) */
+  /** 진화 용이성 점수 */
   evolutionEase: number;
+  /** 특성 보정 점수 (optional, 기존 코드 호환성) */
+  abilityBonus?: number;
+}
+
+/** 공격형 분류 */
+export type AttackType = "physical" | "special" | "dual";
+
+/** 저장된 파티 (Supabase parties 테이블) */
+export interface SavedParty {
+  id: string;
+  name: string;
+  pokemon_ids: number[];
+  game_id: string;
+  story_point_id: string | null;
+  created_at: string;
 }

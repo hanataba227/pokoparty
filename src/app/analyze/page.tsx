@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   RadarChart,
   PolarGrid,
@@ -10,17 +11,12 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from 'recharts';
-import type { Pokemon, PokemonType, AnalysisResult } from '@/types/pokemon';
+import type { Pokemon, AnalysisResult } from '@/types/pokemon';
+import { ALL_TYPES } from '@/lib/type-calc';
 import PartySlot from '@/components/PartySlot';
 import PokemonSearchModal from '@/components/PokemonSearchModal';
 import TypeBadge from '@/components/TypeBadge';
 import { Loader2, BarChart3, Shield, Swords, AlertTriangle } from 'lucide-react';
-
-const ALL_TYPES: PokemonType[] = [
-  '노말', '불꽃', '물', '풀', '전기', '얼음',
-  '격투', '독', '땅', '비행', '에스퍼', '벌레',
-  '바위', '고스트', '드래곤', '악', '강철', '페어리',
-];
 
 /** 종합 점수 등급 색상 */
 function getScoreColor(score: number): string {
@@ -38,6 +34,20 @@ function getScoreLabel(score: number): string {
 }
 
 export default function AnalyzePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+      </div>
+    }>
+      <AnalyzeContent />
+    </Suspense>
+  );
+}
+
+function AnalyzeContent() {
+  const searchParams = useSearchParams();
+
   // 파티 상태 (최대 6마리)
   const [party, setParty] = useState<(Pokemon | null)[]>([null, null, null, null, null, null]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -52,6 +62,9 @@ export default function AnalyzePage() {
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+
+  // URL에서 전달된 pokemon_ids 자동 세팅 여부
+  const autoAnalyzeDone = useRef(false);
 
   // 포켓몬 목록 로드
   useEffect(() => {
@@ -70,6 +83,29 @@ export default function AnalyzePage() {
     }
     fetchPokemon();
   }, []);
+
+  // URL의 pokemon_ids로 파티 자동 세팅
+  const [shouldAutoAnalyze, setShouldAutoAnalyze] = useState(false);
+
+  useEffect(() => {
+    if (autoAnalyzeDone.current || allPokemon.length === 0) return;
+
+    const idsParam = searchParams.get('pokemon_ids');
+    if (!idsParam) return;
+
+    const ids = idsParam.split(',').map(Number).filter((id) => !isNaN(id) && id > 0);
+    if (ids.length === 0) return;
+
+    const newParty: (Pokemon | null)[] = [null, null, null, null, null, null];
+    ids.slice(0, 6).forEach((id, i) => {
+      const found = allPokemon.find((p) => p.id === id);
+      if (found) newParty[i] = found;
+    });
+
+    setParty(newParty);
+    setShouldAutoAnalyze(true);
+    autoAnalyzeDone.current = true;
+  }, [allPokemon, searchParams]);
 
   // 슬롯 클릭 → 모달 열기
   const handleSlotClick = (index: number) => {
@@ -132,6 +168,14 @@ export default function AnalyzePage() {
     }
   }, [party]);
 
+  // URL에서 파티 세팅 후 자동 분석 실행
+  useEffect(() => {
+    if (shouldAutoAnalyze) {
+      setShouldAutoAnalyze(false);
+      handleAnalyze();
+    }
+  }, [shouldAutoAnalyze, handleAnalyze]);
+
   // 레이더 차트 데이터 변환
   const radarData = analysis
     ? ALL_TYPES.map((type) => ({
@@ -150,7 +194,7 @@ export default function AnalyzePage() {
       <div className="max-w-5xl mx-auto px-4 py-8 sm:py-12">
         {/* 페이지 헤더 */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold text-slate-900">
+          <h1 className="text-3xl font-bold text-slate-900">
             파티 분석
           </h1>
           <p className="mt-2 text-slate-500">
@@ -272,7 +316,7 @@ export default function AnalyzePage() {
                 1.0 이상일수록 해당 타입에 취약하고, 1.0 미만일수록 내성이 있습니다.
               </p>
               <div className="w-full h-[400px] sm:h-[450px]">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                   <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="70%">
                     <PolarGrid stroke="#94a3b8" />
                     <PolarAngleAxis

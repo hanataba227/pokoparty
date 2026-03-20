@@ -8,17 +8,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { AnalysisResult, PokemonType } from "@/types/pokemon";
 import { loadPokemonData, loadTypeChart } from "@/lib/data-loader";
+import { getApiErrorMessage } from "@/lib/api-error";
 import {
   ALL_TYPES,
-  getTypeWeaknesses,
-  getTypeResistances,
-  getTypeImmunities,
   calculateOffensiveCoverage,
   getDefensiveMatchups,
 } from "@/lib/type-calc";
 import { classifyRole, calculateRoleBalance } from "@/lib/roles";
+import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
+  const { allowed, remaining } = checkRateLimit(getRateLimitKey(request));
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." },
+      { status: 429, headers: { "Retry-After": "60", "X-RateLimit-Remaining": String(remaining) } },
+    );
+  }
+
   try {
     const body = await request.json();
     const { pokemonIds } = body as { pokemonIds: string[] };
@@ -117,11 +124,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("분석 API 오류:", error);
 
-    const message =
-      error instanceof Error && error.message.includes("데이터 파일을 찾을 수 없습니다")
-        ? error.message
-        : "파티 분석 중 오류가 발생했습니다.";
-
+    const message = getApiErrorMessage(error, "파티 분석 중 오류가 발생했습니다.");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

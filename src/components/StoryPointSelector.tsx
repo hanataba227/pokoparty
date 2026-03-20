@@ -1,7 +1,7 @@
 'use client';
 
 import { Shield, Swords } from 'lucide-react';
-import type { StoryPoint, PokemonType } from '@/types/pokemon';
+import type { StoryPoint } from '@/types/pokemon';
 import TypeBadge from './TypeBadge';
 import { TYPE_COLORS } from './TypeBadge';
 

@@ -1,12 +1,14 @@
 /**
  * 스코어링 엔진
- * algorithm.md의 스코어링 공식을 그대로 구현
+ * optimized-weights.json의 최적화된 가중치를 사용하여 스코어링
  *
- * 추천_점수 = (타입_커버리지 × 0.25)
- *           + (등장_시점_점수 × 0.25)
- *           + (레벨업_속도 × 0.15)
- *           + (기술_습득_효율 × 0.2)
- *           + (진화_용이성 × 0.15)
+ * 6칼럼 가중치 매핑:
+ * - combatFitness → typeCoverage (전투적합도)
+ * - moveCoverage  → movePool (기술폭)
+ * - acquisition   → availability (입수시기)
+ * - stabPower     → levelUpSpeed (자속화력)
+ * - evolutionEase → evolutionEase (진화용이성)
+ * - abilityBonus  → abilityBonus (특성보정)
  */
 import type {
   Pokemon,
@@ -15,33 +17,23 @@ import type {
   StoryPoint,
   ScoringBreakdown,
   PartyRecommendation,
-  Move,
+  RecommendFilters,
+  AttackType,
 } from "@/types/pokemon";
 import {
   getTypeEffectiveness,
-  getTypeCoverage,
-  getTypeWeaknesses,
   calculateWeaknessChange,
   ALL_TYPES,
 } from "./type-calc";
 import { classifyRole, calculateRoleBalance } from "./roles";
 import {
-  loadPokemonData,
   loadStoryData,
   loadEncounters,
   getMovesForPokemon,
   getAvailablePokemonIds,
 } from "./data-loader";
-
-// ========================================
-// 가중치 (algorithm.md에서 정의, 변경 금지)
-// ========================================
-
-const WEIGHT_TYPE_COVERAGE = 0.25;
-const WEIGHT_AVAILABILITY = 0.25;
-const WEIGHT_LEVEL_UP = 0.15;
-const WEIGHT_MOVE_LEARN = 0.2;
-const WEIGHT_EVOLUTION = 0.15;
+import { getFinalScore } from "./score-utils";
+import { classifyAttackType } from "./weight-config";
 
 // ========================================
 // 1. 타입 커버리지 점수
@@ -363,13 +355,18 @@ export function calculateEvolutionScore(
 // ========================================
 
 /**
+ * 포켓몬의 공격형 분류
+ * - 물공형: atk - spa > 10
+ * - 특공형: spa - atk > 10
+ * - 쌍두형: |atk - spa| <= 10
+ */
+export function getAttackType(pokemon: Pokemon): AttackType {
+  return classifyAttackType(pokemon.stats.atk, pokemon.stats.spa);
+}
+
+/**
  * 종합 추천 점수 계산
- *
- * 추천_점수 = (타입_커버리지 × 0.25)
- *           + (등장_시점_점수 × 0.25)
- *           + (레벨업_속도 × 0.15)
- *           + (기술_습득_효율 × 0.2)
- *           + (진화_용이성 × 0.15)
+ * optimized-weights.json의 6칼럼 가중치를 사용하여 서브스코어 계산
  */
 export function calculateTotalScore(
   pokemon: Pokemon,
@@ -382,6 +379,8 @@ export function calculateTotalScore(
   const levelUpSpeed = calculateLevelUpScore(pokemon);
   const movePool = calculateMoveLearnScore(pokemon, storyPoint, typeChart);
   const evolutionEase = calculateEvolutionScore(pokemon, storyPoint);
+  // abilityBonus: 기본값 50 (향후 특성 데이터 연동 시 구현)
+  const abilityBonus = 50;
 
   return {
     typeCoverage,
@@ -389,20 +388,8 @@ export function calculateTotalScore(
     levelUpSpeed,
     movePool,
     evolutionEase,
+    abilityBonus,
   };
-}
-
-/**
- * ScoringBreakdown에서 최종 점수 계산
- */
-function getFinalScore(breakdown: ScoringBreakdown): number {
-  return (
-    breakdown.typeCoverage * WEIGHT_TYPE_COVERAGE +
-    breakdown.availability * WEIGHT_AVAILABILITY +
-    breakdown.levelUpSpeed * WEIGHT_LEVEL_UP +
-    breakdown.movePool * WEIGHT_MOVE_LEARN +
-    breakdown.evolutionEase * WEIGHT_EVOLUTION
-  );
 }
 
 // ========================================
@@ -448,6 +435,47 @@ function generateReasons(
 }
 
 // ========================================
+// 필터 관련 상수
+// ========================================
+
+/** 8세대 스타터 포켓몬 라인 (전국도감 번호) */
+const STARTER_LINES = new Set([
+  810, 811, 812, // 흥나숭 라인
+  813, 814, 815, // 염버니 라인
+  816, 817, 818, // 울머기 라인
+]);
+
+/**
+ * 필터 조건에 따라 후보 포켓몬을 필터링
+ */
+function applyFilters(candidates: Pokemon[], filters?: RecommendFilters): Pokemon[] {
+  if (!filters) return candidates;
+
+  return candidates.filter((p) => {
+    // 통신교환 진화 제외
+    if (filters.excludeTradeEvolution && p.evolutions) {
+      const hasTradeEvo = p.evolutions.some((evo) => evo.method === "trade");
+      if (hasTradeEvo) return false;
+    }
+
+    // 도구/돌 진화 제외
+    if (filters.excludeItemEvolution && p.evolutions) {
+      const hasItemEvo = p.evolutions.some(
+        (evo) => evo.method === "stone" || evo.method === "item"
+      );
+      if (hasItemEvo) return false;
+    }
+
+    // 스타터 포켓몬 제외 (includeStarters가 명시적으로 false일 때만)
+    if (filters.includeStarters === false) {
+      if (STARTER_LINES.has(p.id)) return false;
+    }
+
+    return true;
+  });
+}
+
+// ========================================
 // 파티 추천
 // ========================================
 
@@ -459,6 +487,7 @@ function generateReasons(
  * @param typeChart 타입 상성 매트릭스
  * @param allPokemon 전체 포켓몬 데이터
  * @param slotsToFill 채울 슬롯 수 (기본 6 - fixedPokemon 수)
+ * @param filters 추천 필터 옵션
  * @returns 추천 결과 배열 (점수순 정렬)
  */
 export function recommendParty(
@@ -466,7 +495,8 @@ export function recommendParty(
   fixedPokemon: Pokemon[],
   typeChart: TypeChart,
   allPokemon: Pokemon[],
-  slotsToFill?: number
+  slotsToFill?: number,
+  filters?: RecommendFilters
 ): PartyRecommendation[] {
   const maxSlots = slotsToFill ?? (6 - fixedPokemon.length);
 
@@ -477,9 +507,12 @@ export function recommendParty(
   const fixedIds = new Set(fixedPokemon.map((p) => p.id));
 
   // 후보 포켓몬 필터링
-  const candidates = allPokemon.filter(
+  let candidates = allPokemon.filter(
     (p) => availableIds.has(p.id) && !fixedIds.has(p.id)
   );
+
+  // 필터 옵션 적용
+  candidates = applyFilters(candidates, filters);
 
   // 각 후보에 대해 점수 계산
   const scored: {
@@ -495,7 +528,8 @@ export function recommendParty(
       storyPoint,
       typeChart
     );
-    const finalScore = getFinalScore(breakdown);
+    const attackType = getAttackType(candidate);
+    const finalScore = getFinalScore(breakdown, attackType);
     scored.push({ pokemon: candidate, breakdown, finalScore });
   }
 
@@ -517,7 +551,8 @@ export function recommendParty(
           storyPoint,
           typeChart
         );
-        let finalScore = getFinalScore(breakdown);
+        const atkType = getAttackType(s.pokemon);
+        let finalScore = getFinalScore(breakdown, atkType);
 
         // 밸런스 패널티 적용
         const currentRoles = currentParty.map((p) => classifyRole(p));

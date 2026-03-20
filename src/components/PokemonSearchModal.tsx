@@ -3,8 +3,9 @@
 import { useState, useMemo } from 'react';
 import { X, Search } from 'lucide-react';
 import type { Pokemon, PokemonType } from '@/types/pokemon';
+import { ALL_TYPES } from '@/lib/type-calc';
 import PokemonCard from './PokemonCard';
-import TypeBadge, { TYPE_COLORS } from './TypeBadge';
+import { TYPE_COLORS } from './TypeBadge';
 
 interface PokemonSearchModalProps {
   isOpen: boolean;
@@ -12,12 +13,6 @@ interface PokemonSearchModalProps {
   onSelect: (pokemon: Pokemon) => void;
   availablePokemon: Pokemon[];
 }
-
-const ALL_TYPES: PokemonType[] = [
-  '노말', '불꽃', '물', '풀', '전기', '얼음',
-  '격투', '독', '땅', '비행', '에스퍼', '벌레',
-  '바위', '고스트', '드래곤', '악', '강철', '페어리',
-];
 
 export default function PokemonSearchModal({
   isOpen,

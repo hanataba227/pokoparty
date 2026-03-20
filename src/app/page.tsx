@@ -5,7 +5,7 @@ export default function Home() {
     <div className="flex flex-col items-center justify-center min-h-screen">
       {/* 히어로 섹션 */}
       <section className="py-20 sm:py-28 text-center">
-        <h1 className="text-4xl sm:text-5xl font-extrabold text-slate-900 leading-tight">
+        <h1 className="text-3xl font-bold text-slate-900 leading-tight">
           나만의 스토리 파티를
           <br />
           <span className="text-indigo-600">
