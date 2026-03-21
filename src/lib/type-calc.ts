@@ -24,28 +24,6 @@ export function getTypeEffectiveness(
 }
 
 /**
- * 공격 타입들로 방어 타입들에 대한 커버리지 배율 계산
- * 복합 타입 방어 시 각 타입 배율의 곱
- */
-export function getTypeCoverage(
-  attackTypes: PokemonType[],
-  defendTypes: PokemonType[],
-  typeChart: TypeChart
-): number {
-  let bestMultiplier = 0;
-
-  for (const atkType of attackTypes) {
-    let multiplier = 1;
-    for (const defType of defendTypes) {
-      multiplier *= getTypeEffectiveness(atkType, defType, typeChart);
-    }
-    bestMultiplier = Math.max(bestMultiplier, multiplier);
-  }
-
-  return bestMultiplier;
-}
-
-/**
  * 특정 타입 조합의 약점 타입 목록 반환
  * (배율 > 1인 공격 타입들)
  */
@@ -89,29 +67,6 @@ export function getTypeResistances(
   }
 
   return resistances;
-}
-
-/**
- * 특정 타입 조합의 무효 타입 목록 반환
- * (배율 === 0인 공격 타입들)
- */
-export function getTypeImmunities(
-  types: PokemonType[],
-  typeChart: TypeChart
-): PokemonType[] {
-  const immunities: PokemonType[] = [];
-
-  for (const atkType of ALL_TYPES) {
-    let multiplier = 1;
-    for (const defType of types) {
-      multiplier *= getTypeEffectiveness(atkType, defType, typeChart);
-    }
-    if (multiplier === 0) {
-      immunities.push(atkType);
-    }
-  }
-
-  return immunities;
 }
 
 /**
@@ -197,48 +152,3 @@ export function calculateOffensiveCoverage(
   return Array.from(coveredTypes);
 }
 
-/**
- * 파티에 새 포켓몬 추가 시 약점 변화량 계산
- * 음수: 약점 감소 (좋음), 양수: 약점 증가 (나쁨)
- */
-export function calculateWeaknessChange(
-  currentPartyTypes: PokemonType[][],
-  newPokemonTypes: PokemonType[],
-  typeChart: TypeChart
-): number {
-  // 현재 파티의 약점 수
-  const currentWeaknesses = countPartyWeaknesses(currentPartyTypes, typeChart);
-
-  // 새 포켓몬 추가 후 약점 수
-  const newPartyTypes = [...currentPartyTypes, newPokemonTypes];
-  const newWeaknesses = countPartyWeaknesses(newPartyTypes, typeChart);
-
-  return newWeaknesses - currentWeaknesses;
-}
-
-/**
- * 파티 전체의 약점 점수 계산
- * 4배 약점은 가중치 2배
- */
-function countPartyWeaknesses(
-  partyTypes: PokemonType[][],
-  typeChart: TypeChart
-): number {
-  let weaknessScore = 0;
-
-  for (const memberTypes of partyTypes) {
-    for (const atkType of ALL_TYPES) {
-      let multiplier = 1;
-      for (const defType of memberTypes) {
-        multiplier *= getTypeEffectiveness(atkType, defType, typeChart);
-      }
-      if (multiplier >= 4) {
-        weaknessScore += 2; // 4배 약점은 가중치 2배
-      } else if (multiplier >= 2) {
-        weaknessScore += 1;
-      }
-    }
-  }
-
-  return weaknessScore;
-}

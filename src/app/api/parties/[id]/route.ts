@@ -1,17 +1,66 @@
 /**
  * PATCH  /api/parties/:id — 파티 이름 수정
  * DELETE /api/parties/:id — 파티 삭제
+ *
+ * 참고: 이 파일의 핸들러는 두 번째 인자(params)를 받아야 하므로
+ * withRateLimit 래퍼 대신 checkRateLimit를 직접 사용합니다.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { requireAuth } from "@/lib/auth-guard";
 import { getApiErrorMessage } from "@/lib/api-error";
+import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
+/** rate limit 체크 헬퍼 — 초과 시 429 응답을 반환, 허용 시 null */
+function enforceRateLimit(request: NextRequest): NextResponse | null {
+  const { allowed } = checkRateLimit(getRateLimitKey(request));
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." },
+      { status: 429, headers: { "Retry-After": "60", "X-RateLimit-Remaining": "0" } },
+    );
+  }
+  return null;
+}
+
+/** 파티 소유권 확인 — 404/403 시 에러 응답 반환, 정상이면 null */
+async function verifyOwnership(
+  supabase: Awaited<ReturnType<typeof createServerSupabase>>,
+  partyId: string,
+  userId: string,
+  action: "수정" | "삭제",
+): Promise<NextResponse | null> {
+  const { data: existing, error: fetchError } = await supabase
+    .from("saved_parties")
+    .select("id, user_id")
+    .eq("id", partyId)
+    .single();
+
+  if (fetchError || !existing) {
+    return NextResponse.json(
+      { error: "파티를 찾을 수 없습니다." },
+      { status: 404 },
+    );
+  }
+
+  if (existing.user_id !== userId) {
+    return NextResponse.json(
+      { error: `본인의 파티만 ${action}할 수 있습니다.` },
+      { status: 403 },
+    );
+  }
+
+  return null;
+}
+
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
+  const rateLimitResponse = enforceRateLimit(request);
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const { id } = await params;
     const auth = await requireAuth();
@@ -37,25 +86,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     // 소유자 확인 (RLS가 처리하지만 서버에서도 확인)
-    const { data: existing, error: fetchError } = await supabase
-      .from("saved_parties")
-      .select("id, user_id")
-      .eq("id", id)
-      .single();
-
-    if (fetchError || !existing) {
-      return NextResponse.json(
-        { error: "파티를 찾을 수 없습니다." },
-        { status: 404 },
-      );
-    }
-
-    if (existing.user_id !== user.id) {
-      return NextResponse.json(
-        { error: "본인의 파티만 수정할 수 있습니다." },
-        { status: 403 },
-      );
-    }
+    const ownerError = await verifyOwnership(supabase, id, user.id, "수정");
+    if (ownerError) return ownerError;
 
     // 수정
     const { data: updated, error: updateError } = await supabase
@@ -82,6 +114,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 }
 
 export async function DELETE(_request: NextRequest, { params }: RouteParams) {
+  const rateLimitResponse = enforceRateLimit(_request);
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const { id } = await params;
     const auth = await requireAuth();
@@ -90,25 +125,8 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     const supabase = await createServerSupabase();
 
     // 소유자 확인
-    const { data: existing, error: fetchError } = await supabase
-      .from("saved_parties")
-      .select("id, user_id")
-      .eq("id", id)
-      .single();
-
-    if (fetchError || !existing) {
-      return NextResponse.json(
-        { error: "파티를 찾을 수 없습니다." },
-        { status: 404 },
-      );
-    }
-
-    if (existing.user_id !== user.id) {
-      return NextResponse.json(
-        { error: "본인의 파티만 삭제할 수 있습니다." },
-        { status: 403 },
-      );
-    }
+    const ownerError = await verifyOwnership(supabase, id, user.id, "삭제");
+    if (ownerError) return ownerError;
 
     // 삭제
     const { error: deleteError } = await supabase

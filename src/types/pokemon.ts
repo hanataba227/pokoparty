@@ -125,21 +125,6 @@ export interface Move {
 }
 
 // ========================================
-// Game (게임)
-// ========================================
-
-export interface Game {
-  /** 고유 식별자 */
-  id: string;
-  /** 한국어 이름 */
-  name: string;
-  /** 세대 번호 */
-  generation: number;
-  /** 지방 이름 */
-  region: string;
-}
-
-// ========================================
 // StoryPoint (스토리 지점)
 // ========================================
 
@@ -180,16 +165,6 @@ export interface Encounter {
 // ========================================
 // TypeChart (타입 상성표)
 // ========================================
-
-/** 타입 상성 항목 (18×18 매트릭스의 개별 셀) */
-export interface TypeChartEntry {
-  /** 공격 타입 */
-  attackType: PokemonType;
-  /** 방어 타입 */
-  defenseType: PokemonType;
-  /** 배율: 2.0 (효과좋음) / 1.0 (보통) / 0.5 (반감) / 0 (무효) */
-  multiplier: number;
-}
 
 /**
  * 타입 상성 매트릭스
@@ -240,6 +215,25 @@ export interface RecommendFilters {
 // 추천 / 분석 결과 타입
 // ========================================
 
+/** 추천 이유 상세 정보 */
+export interface DetailedReason {
+  /** 이유 카테고리 */
+  category: 'move' | 'evolution' | 'coverage' | 'tip';
+  /** 한 줄 요약 (기존 reasons 스타일) */
+  summary: string;
+  /** 상세 데이터 (카테고리별 선택적) */
+  details?: {
+    moveName?: string;
+    moveType?: PokemonType;
+    movePower?: number;
+    learnLevel?: number;
+    isStab?: boolean;
+    coveredTypes?: PokemonType[];
+    evolutionChain?: string;
+    evolutionLevel?: number;
+  };
+}
+
 /** 파티 추천 결과 */
 export interface PartyRecommendation {
   /** 추천 포켓몬 */
@@ -252,6 +246,8 @@ export interface PartyRecommendation {
   role: PokemonRole;
   /** 스코어링 세부 점수 */
   breakdown: ScoringBreakdown;
+  /** 상세 추천 이유 (구체적 기술명, 진화 정보, 커버리지 포함) */
+  detailedReasons?: DetailedReason[];
 }
 
 /** 타입 분석 결과 */

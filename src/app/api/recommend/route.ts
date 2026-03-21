@@ -15,23 +15,15 @@ import {
   getPokemonById,
 } from "@/lib/data-loader";
 import { recommendParty } from "@/lib/scoring";
-import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
+import { withRateLimit } from "@/lib/rate-limit";
 
-export async function POST(request: NextRequest) {
-  const { allowed, remaining } = checkRateLimit(getRateLimitKey(request));
-  if (!allowed) {
-    return NextResponse.json(
-      { error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." },
-      { status: 429, headers: { "Retry-After": "60", "X-RateLimit-Remaining": String(remaining) } },
-    );
-  }
-
+export const POST = withRateLimit(async (request: NextRequest) => {
   try {
     const body = await request.json();
     const { storyPointId, fixedPokemon, slotsToFill, filters } = body as {
-      storyPointId: string;
-      fixedPokemon: string[];
-      slotsToFill?: number;
+      storyPointId: unknown;
+      fixedPokemon: unknown;
+      slotsToFill?: unknown;
       filters?: {
         excludeTradeEvolution?: boolean;
         excludeItemEvolution?: boolean;
@@ -43,12 +35,94 @@ export async function POST(request: NextRequest) {
       };
     };
 
-    // 유효성 검사
+    // --- 입력 검증 ---
+
+    // storyPointId 검증: 문자열이어야 함 (빈 문자열 허용 — 자유 추천)
+    if (storyPointId !== undefined && storyPointId !== null && typeof storyPointId !== "string") {
+      return NextResponse.json(
+        { error: "스토리 포인트 ID가 올바르지 않습니다." },
+        { status: 400 },
+      );
+    }
+
+    // fixedPokemon 검증: 문자열 배열
     if (!Array.isArray(fixedPokemon)) {
       return NextResponse.json(
         { error: "고정 포켓몬 목록이 올바르지 않습니다." },
-        { status: 400 }
+        { status: 400 },
       );
+    }
+    for (const item of fixedPokemon) {
+      if (typeof item !== "string") {
+        return NextResponse.json(
+          { error: "고정 포켓몬 ID는 문자열이어야 합니다." },
+          { status: 400 },
+        );
+      }
+    }
+
+    // slotsToFill 검증: 정수, 1~6 범위
+    if (slotsToFill !== undefined && slotsToFill !== null) {
+      if (typeof slotsToFill !== "number" || !Number.isInteger(slotsToFill) || slotsToFill < 1 || slotsToFill > 6) {
+        return NextResponse.json(
+          { error: "채울 슬롯 수는 1~6 사이의 정수여야 합니다." },
+          { status: 400 },
+        );
+      }
+    }
+
+    // filters 검증
+    if (filters !== undefined && filters !== null) {
+      if (typeof filters !== "object") {
+        return NextResponse.json(
+          { error: "필터 옵션이 올바르지 않습니다." },
+          { status: 400 },
+        );
+      }
+      if (filters.excludeTradeEvolution !== undefined && typeof filters.excludeTradeEvolution !== "boolean") {
+        return NextResponse.json(
+          { error: "필터 옵션(excludeTradeEvolution)이 올바르지 않습니다." },
+          { status: 400 },
+        );
+      }
+      if (filters.excludeItemEvolution !== undefined && typeof filters.excludeItemEvolution !== "boolean") {
+        return NextResponse.json(
+          { error: "필터 옵션(excludeItemEvolution)이 올바르지 않습니다." },
+          { status: 400 },
+        );
+      }
+      if (filters.includeStarters !== undefined && typeof filters.includeStarters !== "boolean") {
+        return NextResponse.json(
+          { error: "필터 옵션(includeStarters)이 올바르지 않습니다." },
+          { status: 400 },
+        );
+      }
+      if (filters.finalOnly !== undefined && typeof filters.finalOnly !== "boolean") {
+        return NextResponse.json(
+          { error: "필터 옵션(finalOnly)이 올바르지 않습니다." },
+          { status: 400 },
+        );
+      }
+      if (filters.gen8Only !== undefined && typeof filters.gen8Only !== "boolean") {
+        return NextResponse.json(
+          { error: "필터 옵션(gen8Only)이 올바르지 않습니다." },
+          { status: 400 },
+        );
+      }
+      if (filters.selectedTypes !== undefined) {
+        if (!Array.isArray(filters.selectedTypes) || filters.selectedTypes.some((t) => typeof t !== "string")) {
+          return NextResponse.json(
+            { error: "필터 옵션(selectedTypes)이 올바르지 않습니다." },
+            { status: 400 },
+          );
+        }
+      }
+      if (filters.gameVersion !== undefined && filters.gameVersion !== "sword" && filters.gameVersion !== "shield") {
+        return NextResponse.json(
+          { error: "필터 옵션(gameVersion)이 올바르지 않습니다." },
+          { status: 400 },
+        );
+      }
     }
 
     // 데이터 로드 (게임 버전별 포켓몬 JSON 분리 지원)
@@ -69,7 +143,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 고정 포켓몬 조회
-    const fixed = fixedPokemon
+    const fixed = (fixedPokemon as string[])
       .map((idStr) => {
         const id = parseInt(idStr, 10);
         return getPokemonById(id);
@@ -82,7 +156,7 @@ export async function POST(request: NextRequest) {
       fixed,
       typeChart,
       allPokemon,
-      slotsToFill,
+      slotsToFill as number | undefined,
       filters ? {
         ...filters,
         selectedTypes: filters.selectedTypes as PokemonType[] | undefined,
@@ -99,4 +173,4 @@ export async function POST(request: NextRequest) {
     const message = getApiErrorMessage(error, "추천 계산 중 오류가 발생했습니다.");
     return NextResponse.json({ error: message }, { status: 500 });
   }
-}
+});

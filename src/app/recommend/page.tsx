@@ -1,236 +1,54 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
 import StepIndicator from '@/components/StepIndicator';
 import PartySlot from '@/components/PartySlot';
 import PokemonSearchModal from '@/components/PokemonSearchModal';
 import PokemonCard from '@/components/PokemonCard';
-import type { Pokemon, ScoringBreakdown, PokemonType } from '@/types/pokemon';
 import { Loader2, ChevronLeft, ChevronRight, ChevronDown, SkipForward, Save, LogIn, SlidersHorizontal, Filter } from 'lucide-react';
 import { TYPE_COLORS } from '@/components/TypeBadge';
 import { UI } from '@/lib/ui-tokens';
 import { ALL_TYPES } from '@/lib/type-calc';
-import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
+import { useRecommendState, GAME_TITLES } from '@/hooks/useRecommendState';
 
 const STEPS = ['게임 선택', '고정 포켓몬', '추천 결과'];
 
-const GAME_TITLES = [
-  { id: 'gen8-swsh-sword', label: '소드', gameId: 'gen8-swsh', icon: '🗡️' },
-  { id: 'gen8-swsh-shield', label: '실드', gameId: 'gen8-swsh', icon: '🛡️' },
-  { id: 'gen8-pla', label: '레전드 아르세우스', gameId: 'gen8-pla', icon: '⭐', disabled: true },
-  { id: 'gen9-sv-scarlet', label: '스칼렛', gameId: 'gen9-sv', icon: '🔴', disabled: true },
-  { id: 'gen9-sv-violet', label: '바이올렛', gameId: 'gen9-sv', icon: '🟣', disabled: true },
-];
-
-interface RecommendationItem {
-  pokemon: Pokemon;
-  score: number;
-  reasons: string[];
-  role: string;
-  breakdown: ScoringBreakdown;
-}
-
 export default function RecommendPage() {
-  const [currentStep, setCurrentStep] = useState(1);
-
-  // Step 1: 게임 선택
-  const [selectedGameId, setSelectedGameId] = useState<string>();
-
-  // Step 2: 고정 포켓몬
-  const [allPokemon, setAllPokemon] = useState<Pokemon[]>([]);
-  const [fixedPokemon, setFixedPokemon] = useState<(Pokemon | undefined)[]>(
-    Array(6).fill(undefined)
-  );
-  const [modalOpen, setModalOpen] = useState(false);
-  const [activeSlot, setActiveSlot] = useState<number>(0);
-  const [pokemonLoading, setPokemonLoading] = useState(false);
-  const [pokemonError, setPokemonError] = useState<string>();
-
-  // Step 3: 추천 결과
-  const [recommendations, setRecommendations] = useState<RecommendationItem[]>([]);
-  const [recommendLoading, setRecommendLoading] = useState(false);
-  const [recommendError, setRecommendError] = useState<string>();
-
-  // 필터 옵션
-  const [basicOpen, setBasicOpen] = useState(false);
-  const [typeOpen, setTypeOpen] = useState(false);
-  const [excludeTradeEvolution, setExcludeTradeEvolution] = useState(true); // 기본: 통신교환 제외
-  const [excludeItemEvolution, setExcludeItemEvolution] = useState(true); // 기본: 도구진화 제외
-  const [includeStarters, setIncludeStarters] = useState(false); // 기본: 스타터 미포함
-  const [finalOnly, setFinalOnly] = useState(true); // 기본: 최종 진화만 추천
-  const [gen8Only, setGen8Only] = useState(false); // 기본: 전체 세대
-  const [selectedTypes, setSelectedTypes] = useState<Set<PokemonType>>(() => new Set(ALL_TYPES));
-
-  // 파티 저장
-  const { user } = useAuth();
-  const [saving, setSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [saveError, setSaveError] = useState<string>();
-
-  // 게임 버전 결정 (소드/실드)
-  const gameVersion = selectedGameId === 'gen8-swsh-sword' ? 'sword'
-    : selectedGameId === 'gen8-swsh-shield' ? 'shield'
-    : undefined;
-
-  // Step 2: 포켓몬 목록 로드 (Step 2 진입 시, 게임 버전별)
-  useEffect(() => {
-    if (currentStep < 2 || !selectedGameId) return;
-
-    async function fetchPokemon() {
-      try {
-        setPokemonLoading(true);
-        setPokemonError(undefined);
-        const params = gameVersion ? `?gameVersion=${gameVersion}` : '';
-        const res = await fetch(`/api/pokemon${params}`);
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || '포켓몬 목록을 불러오지 못했습니다.');
-        }
-        const data = await res.json();
-        setAllPokemon(data.pokemon);
-      } catch (err) {
-        setPokemonError(
-          err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.'
-        );
-      } finally {
-        setPokemonLoading(false);
-      }
-    }
-    fetchPokemon();
-  }, [currentStep, selectedGameId, gameVersion]);
-
-  // 고정 포켓몬 ID 안정화 (참조 변경으로 인한 불필요한 재호출 방지)
-  const fixedPokemonIds = useMemo(
-    () => fixedPokemon.filter((p): p is Pokemon => p !== undefined).map((p) => String(p.id)),
-    [fixedPokemon]
-  );
-
-  // Step 3: 추천 요청 (자유 추천 — storyPointId 없음)
-  const fetchRecommendations = useCallback(async () => {
-    try {
-      setRecommendLoading(true);
-      setRecommendError(undefined);
-
-      const slotsToFill = 6 - fixedPokemonIds.length;
-
-      const res = await fetch('/api/recommend', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fixedPokemon: fixedPokemonIds,
-          slotsToFill,
-          filters: {
-            excludeTradeEvolution,
-            excludeItemEvolution,
-            includeStarters,
-            finalOnly,
-            gen8Only,
-            selectedTypes: Array.from(selectedTypes),
-            gameVersion,
-          },
-        }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || '추천을 가져오지 못했습니다.');
-      }
-
-      const data = await res.json();
-      setRecommendations(data.recommendations || []);
-    } catch (err) {
-      setRecommendError(
-        err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.'
-      );
-    } finally {
-      setRecommendLoading(false);
-    }
-  }, [gameVersion, fixedPokemonIds, excludeTradeEvolution, excludeItemEvolution, includeStarters, finalOnly, gen8Only, selectedTypes]);
-
-  // Step 진행 시 추천 요청
-  useEffect(() => {
-    if (currentStep === 3) {
-      fetchRecommendations();
-    }
-  }, [currentStep, fetchRecommendations]);
-
-  const handleSlotClick = (index: number) => {
-    setActiveSlot(index);
-    setModalOpen(true);
-  };
-
-  const handlePokemonSelect = (pokemon: Pokemon) => {
-    setFixedPokemon((prev) => {
-      const updated = [...prev];
-      updated[activeSlot] = pokemon;
-      return updated;
-    });
-  };
-
-  const handleRemovePokemon = (index: number) => {
-    setFixedPokemon((prev) => {
-      const updated = [...prev];
-      updated[index] = undefined;
-      return updated;
-    });
-  };
-
-  const canGoNext = () => {
-    if (currentStep === 1) return !!selectedGameId;
-    if (currentStep === 2) return true; // 고정 포켓몬은 선택사항
-    return false;
-  };
-
-  const goNext = () => {
-    if (currentStep < 3) setCurrentStep((s) => s + 1);
-  };
-
-  const goPrev = () => {
-    if (currentStep > 1) setCurrentStep((s) => s - 1);
-  };
-
-  // 파티 저장 핸들러
-  const handleSaveParty = async () => {
-    const allPokemonIds = [
-      ...fixedPokemon.filter((p): p is Pokemon => p !== undefined).map((p) => p.id),
-      ...recommendations.map((r) => r.pokemon.id),
-    ];
-    if (allPokemonIds.length === 0) return;
-
-    const gameEntry = GAME_TITLES.find((g) => g.id === selectedGameId);
-    const gameId = gameEntry?.gameId === 'gen8-swsh' ? 'sword-shield' : gameEntry?.gameId || '';
-
-    try {
-      setSaving(true);
-      setSaveError(undefined);
-      setSaveSuccess(false);
-
-      const res = await fetch('/api/parties', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: `${gameEntry?.label || '파티'} 추천 파티`,
-          pokemon_ids: allPokemonIds,
-          story_point_id: null,
-          game_id: gameId,
-        }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || '파티 저장에 실패했습니다.');
-      }
-
-      setSaveSuccess(true);
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : '알 수 없는 오류');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const fixedPokemonList = fixedPokemon.filter((p): p is Pokemon => p !== undefined);
+  const {
+    currentStep,
+    setCurrentStep,
+    canGoNext,
+    goNext,
+    goPrev,
+    selectedGameId,
+    setSelectedGameId,
+    fixedPokemon,
+    modalOpen,
+    setModalOpen,
+    handleSlotClick,
+    handlePokemonSelect,
+    handleRemovePokemon,
+    fixedPokemonList,
+    allPokemon,
+    pokemonLoading,
+    pokemonError,
+    basicOpen, setBasicOpen,
+    typeOpen, setTypeOpen,
+    excludeTradeEvolution, setExcludeTradeEvolution,
+    excludeItemEvolution, setExcludeItemEvolution,
+    includeStarters, setIncludeStarters,
+    finalOnly, setFinalOnly,
+    gen8Only, setGen8Only,
+    selectedTypes, setSelectedTypes,
+    recommendations,
+    recommendLoading,
+    recommendError,
+    user,
+    saving,
+    saveSuccess,
+    saveError,
+    handleSaveParty,
+  } = useRecommendState();
 
   return (
     <div className="min-h-screen py-8">
@@ -322,7 +140,7 @@ export default function RecommendPage() {
                   {fixedPokemon.map((pokemon, index) => (
                     <PartySlot
                       key={index}
-                      pokemon={pokemon}
+                      pokemon={pokemon ?? undefined}
                       slotNumber={index + 1}
                       onAdd={() => handleSlotClick(index)}
                       onRemove={pokemon ? () => handleRemovePokemon(index) : undefined}
@@ -491,6 +309,7 @@ export default function RecommendPage() {
                       key={rec.pokemon.id}
                       pokemon={rec.pokemon}
                       score={rec.breakdown}
+                      detailedReasons={rec.detailedReasons}
                     />
                   ))}
                 </div>

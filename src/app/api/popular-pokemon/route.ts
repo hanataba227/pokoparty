@@ -1,8 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase-server';
+import { withRateLimit } from '@/lib/rate-limit';
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
+export const GET = withRateLimit(async (request: NextRequest) => {
+  const searchParams = request.nextUrl.searchParams;
   const limit = Math.min(Number(searchParams.get('limit') || 8), 20);
 
   try {
@@ -12,12 +13,18 @@ export async function GET(request: Request) {
       result_limit: limit,
     });
 
-    if (error || !data || data.length === 0) {
+    if (error) {
+      console.error('인기 포켓몬 DB 조회 오류:', error);
+      return NextResponse.json({ popular: [], source: 'empty' });
+    }
+
+    if (!data || data.length === 0) {
       return NextResponse.json({ popular: [], source: 'empty' });
     }
 
     return NextResponse.json({ popular: data, source: 'database' });
-  } catch {
+  } catch (error) {
+    console.error('인기 포켓몬 API 오류:', error);
     return NextResponse.json({ popular: [], source: 'empty' });
   }
-}
+});

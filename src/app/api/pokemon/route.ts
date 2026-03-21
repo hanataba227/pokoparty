@@ -5,16 +5,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadPokemonData } from "@/lib/data-loader";
 import { getApiErrorMessage } from "@/lib/api-error";
+import { withRateLimit } from "@/lib/rate-limit";
 
-export async function GET(request: NextRequest) {
+export const GET = withRateLimit(async (request: NextRequest) => {
   try {
-    const { searchParams } = new URL(request.url);
+    const searchParams = request.nextUrl.searchParams;
     const gameVersion = searchParams.get("gameVersion") as "sword" | "shield" | null;
+    const fields = searchParams.get("fields");
     const pokemon = loadPokemonData(gameVersion ?? undefined);
+
+    if (fields === "slim") {
+      const slimData = pokemon.map(p => ({ id: p.id, name: p.name, types: p.types }));
+      return NextResponse.json({ pokemon: slimData });
+    }
+
     return NextResponse.json({ pokemon });
   } catch (error) {
     console.error("포켓몬 목록 API 오류:", error);
     const message = getApiErrorMessage(error, "포켓몬 목록을 불러오는 중 오류가 발생했습니다.");
     return NextResponse.json({ error: message }, { status: 500 });
   }
-}
+});

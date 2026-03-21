@@ -17,13 +17,3 @@ export function loadPokedex(): PokedexEntry[] {
   cache = JSON.parse(raw) as PokedexEntry[];
   return cache;
 }
-
-export { GEN_RANGES, getGeneration } from './pokemon-gen';
-
-import { GEN_RANGES as _GEN_RANGES } from './pokemon-gen';
-
-export function getPokedexByGeneration(gen: number): PokedexEntry[] {
-  const range = _GEN_RANGES[gen - 1];
-  if (!range) return [];
-  return loadPokedex().filter((p) => p.id >= range[0] && p.id <= range[1]);
-}

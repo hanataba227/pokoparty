@@ -14,20 +14,12 @@ import {
   calculateOffensiveCoverage,
   getDefensiveMatchups,
 } from "@/lib/type-calc";
-import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
+import { withRateLimit } from "@/lib/rate-limit";
 
-export async function POST(request: NextRequest) {
-  const { allowed, remaining } = checkRateLimit(getRateLimitKey(request));
-  if (!allowed) {
-    return NextResponse.json(
-      { error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." },
-      { status: 429, headers: { "Retry-After": "60", "X-RateLimit-Remaining": String(remaining) } },
-    );
-  }
-
+export const POST = withRateLimit(async (request: NextRequest) => {
   try {
     const body = await request.json();
-    const { pokemonIds } = body as { pokemonIds: string[] };
+    const { pokemonIds } = body as { pokemonIds: unknown };
 
     // 유효성 검사
     if (!Array.isArray(pokemonIds) || pokemonIds.length === 0) {
@@ -44,13 +36,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 각 요소가 유효한 문자열이며 숫자로 변환 가능한지 검증
+    for (const id of pokemonIds) {
+      if (typeof id !== "string") {
+        return NextResponse.json(
+          { error: "포켓몬 ID는 문자열이어야 합니다." },
+          { status: 400 },
+        );
+      }
+      const parsed = Number(id);
+      if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < 1) {
+        return NextResponse.json(
+          { error: `올바르지 않은 포켓몬 ID입니다: ${id}` },
+          { status: 400 },
+        );
+      }
+    }
+
     // 데이터 로드
     const allPokemon = loadPokemonData();
     const typeChart = loadTypeChart();
 
     // 포켓몬 조회
     const pokemonMap = new Map(allPokemon.map((p) => [p.id, p]));
-    const party = pokemonIds
+    const party = (pokemonIds as string[])
       .map((idStr) => pokemonMap.get(parseInt(idStr, 10)))
       .filter((p) => p !== undefined);
 
@@ -116,4 +125,4 @@ export async function POST(request: NextRequest) {
     const message = getApiErrorMessage(error, "파티 분석 중 오류가 발생했습니다.");
     return NextResponse.json({ error: message }, { status: 500 });
   }
-}
+});

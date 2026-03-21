@@ -46,6 +46,44 @@ const TYPE_EN_TO_KO: Record<string, PokemonType> = {
 };
 
 // ========================================
+// 공유 상수
+// ========================================
+
+/** 스타터 포켓몬 진화 라인 ID (8세대) */
+export const STARTER_IDS = [810, 811, 812, 813, 814, 815, 816, 817, 818];
+
+// ========================================
+// 특성 점수 데이터
+// ========================================
+
+export interface AbilityScoreEntry {
+  name: string;
+  name_ko: string;
+  category: string;
+  score: number;
+  description: string;
+}
+
+interface AbilityScoresFile {
+  abilities: Record<string, AbilityScoreEntry>;
+}
+
+let abilityScoresCache: Record<string, AbilityScoreEntry> | null = null;
+
+export function loadAbilityScores(): Record<string, AbilityScoreEntry> {
+  if (abilityScoresCache) return abilityScoresCache;
+  const filePath = getDataPath("scoring", "ability-scores.json");
+  if (!fs.existsSync(filePath)) {
+    abilityScoresCache = {};
+    return abilityScoresCache;
+  }
+  const raw = fs.readFileSync(filePath, "utf-8");
+  const data = JSON.parse(raw) as AbilityScoresFile;
+  abilityScoresCache = data.abilities;
+  return abilityScoresCache;
+}
+
+// ========================================
 // 메모리 캐시
 // ========================================
 
@@ -90,26 +128,20 @@ function convertTypeToKo(typeEn: string): PokemonType {
 // 게임 버전별 JSON 파일 선택
 // ========================================
 
-type GameVersion = "sword" | "shield" | undefined;
+type GameVersion = "sword" | "shield";
 
 /**
  * gameVersion에 따라 적절한 포켓몬 JSON 파일명 반환
  * - sword → gen8-sword-pokemon.json
  * - shield → gen8-shield-pokemon.json
- * - undefined → gen8-swsh-pokemon.json (폴백)
- *
- * 버전별 파일이 없으면 gen8-swsh-pokemon.json로 폴백
+ * - undefined → gen8-sword-pokemon.json (기본값: sword)
  */
 function getPokemonJsonFilename(gameVersion?: GameVersion): string {
-  if (gameVersion === "sword") {
-    const swordPath = getDataPath("pokemon", "gen8-sword-pokemon.json");
-    if (fs.existsSync(swordPath)) return "gen8-sword-pokemon.json";
-  }
   if (gameVersion === "shield") {
     const shieldPath = getDataPath("pokemon", "gen8-shield-pokemon.json");
     if (fs.existsSync(shieldPath)) return "gen8-shield-pokemon.json";
   }
-  return "gen8-swsh-pokemon.json";
+  return "gen8-sword-pokemon.json";
 }
 
 // ========================================
@@ -158,7 +190,7 @@ export function loadPokemonData(gameVersion?: GameVersion): Pokemon[] {
 
   if (pokemonCache && pokemonCacheVersion === cacheKey) return pokemonCache;
 
-  const raw = readJsonFile<RawPokemonFile>("pokemon", filename);
+  const raw = loadRawPokemonFile(gameVersion);
 
   // name_en -> id 캐시 구축 (loadEncounters에서 재사용)
   pokemonNameEnToIdCache = new Map();
@@ -202,6 +234,18 @@ export function loadPokemonData(gameVersion?: GameVersion): Pokemon[] {
   return pokemonCache;
 }
 
+/** 원시 포켓몬 데이터 캐시 (loadPokemonData / loadMovesData 공유) */
+let rawPokemonCache: RawPokemonFile | null = null;
+let rawPokemonCacheVersion: string | null = null;
+
+function loadRawPokemonFile(gameVersion?: GameVersion): RawPokemonFile {
+  const filename = getPokemonJsonFilename(gameVersion);
+  if (rawPokemonCache && rawPokemonCacheVersion === filename) return rawPokemonCache;
+  rawPokemonCache = readJsonFile<RawPokemonFile>("pokemon", filename);
+  rawPokemonCacheVersion = filename;
+  return rawPokemonCache;
+}
+
 /**
  * 포켓몬별 기술 데이터 로드
  * pokemonId -> Move[] 매핑
@@ -213,20 +257,22 @@ export function loadMovesData(gameVersion?: GameVersion): Map<number, Move[]> {
 
   if (movesCache && movesCacheVersion === cacheKey) return movesCache;
 
-  const raw = readJsonFile<RawPokemonFile>("pokemon", filename);
+  const raw = loadRawPokemonFile(gameVersion);
 
   movesCache = new Map();
 
   for (const p of raw.pokemon) {
-    const moves: Move[] = p.moves.map((m) => ({
-      id: m.id,
-      name: m.name,
-      type: convertTypeToKo(m.type),
-      category: m.category as Move["category"],
-      power: m.power,
-      learnLevel: m.learn_level,
-      pokemonId: p.id,
-    }));
+    const moves: Move[] = p.moves
+      .filter((m) => m.type != null)
+      .map((m) => ({
+        id: m.id,
+        name: m.name,
+        type: convertTypeToKo(m.type),
+        category: m.category as Move["category"],
+        power: m.power,
+        learnLevel: m.learn_level,
+        pokemonId: p.id,
+      }));
     movesCache.set(p.id, moves);
   }
 
@@ -262,10 +308,13 @@ interface RawStoryFile {
 interface RawGymEntry {
   order: number;
   leader: string;
+  leader_ko?: string;
   type: string;
   location: string;
-  versions: string[];
+  badge?: string;
+  versions?: string[];
   pokemon: {
+    pokemon_id?: number;
     name_en: string;
     name_ko?: string;
     level: number;
@@ -275,7 +324,8 @@ interface RawGymEntry {
 }
 
 interface RawStoryGymFile {
-  gyms: RawGymEntry[];
+  battles?: RawGymEntry[];
+  gyms?: RawGymEntry[];
   elite_four?: {
     member: string;
     type: string;
@@ -295,6 +345,82 @@ interface RawStoryGymFile {
   };
 }
 
+/** 체육관 order → RawGymEntry[] 매핑 생성 */
+function buildGymByOrderMap(gymRaw: RawStoryGymFile): Map<number, RawGymEntry[]> {
+  const gymByOrder = new Map<number, RawGymEntry[]>();
+  const entries = gymRaw.battles ?? gymRaw.gyms ?? [];
+  for (const gym of entries) {
+    const existing = gymByOrder.get(gym.order) || [];
+    existing.push(gym);
+    gymByOrder.set(gym.order, existing);
+  }
+  return gymByOrder;
+}
+
+/** 체육관 섹션 → StoryPoint 변환 (매칭 시 반환, 미매칭 시 null) */
+function tryParseGymStoryPoint(
+  sp: RawStoryPoint,
+  gymByOrder: Map<number, RawGymEntry[]>
+): StoryPoint | null {
+  if (!sp.section.includes("체육관")) return null;
+  if (sp.type !== "town" && sp.type !== "city") return null;
+
+  const gymNumMatch = sp.section.match(/(\d+)번째/);
+  if (!gymNumMatch) return null;
+
+  const gymOrder = parseInt(gymNumMatch[1]);
+  const gyms = gymByOrder.get(gymOrder);
+  if (!gyms || gyms.length === 0) return null;
+
+  const gym = gyms[0];
+  const bossLevel = Math.max(...gym.pokemon.map((p) => p.level));
+  return {
+    id: `gym-${gymOrder}-${sp.location_id}`,
+    gameId: "sword-shield",
+    order: sp.order,
+    type: "gym" as StoryPointType,
+    bossType: [convertTypeToKo(gym.type)],
+    bossLevel,
+    name: `${sp.location_name} 체육관 (${gym.leader})`,
+  };
+}
+
+/** 챔피언 섹션 → StoryPoint 변환 (매칭 시 반환, 미매칭 시 null) */
+function tryParseChampionStoryPoint(sp: RawStoryPoint): StoryPoint | null {
+  if (!sp.section.includes("챔피언") || sp.type !== "city") return null;
+  return {
+    id: `champion-${sp.location_id}`,
+    gameId: "sword-shield",
+    order: sp.order,
+    type: "champion" as StoryPointType,
+    bossType: ["격투" as PokemonType],
+    bossLevel: 65,
+    name: `${sp.location_name} 챔피언컵`,
+  };
+}
+
+/** 일반 스토리 포인트 생성 */
+function createGenericStoryPoint(sp: RawStoryPoint): StoryPoint {
+  return {
+    id: sp.location_id,
+    gameId: "sword-shield",
+    order: sp.order,
+    type: "rival" as StoryPointType,
+    bossType: [],
+    bossLevel: 0,
+    name: sp.location_name,
+  };
+}
+
+/** 원시 스토리 데이터 캐시 (loadStoryData / getAvailablePokemonIds 공유) */
+let rawStoryCache: RawStoryFile | null = null;
+
+function loadRawStoryFile(): RawStoryFile {
+  if (rawStoryCache) return rawStoryCache;
+  rawStoryCache = readJsonFile<RawStoryFile>("story", "gen8-sword-story.json");
+  return rawStoryCache;
+}
+
 /**
  * 스토리 포인트 데이터 로드
  * story-order + gyms 데이터를 합쳐 StoryPoint[] 생성
@@ -302,77 +428,20 @@ interface RawStoryGymFile {
 export function loadStoryData(): StoryPoint[] {
   if (storyPointsCache) return storyPointsCache;
 
-  const storyRaw = readJsonFile<RawStoryFile>("story", "gen8-swsh-story-order.json");
-  const gymRaw = readJsonFile<RawStoryGymFile>("story", "gen8-swsh-story.json");
+  const storyRaw = loadRawStoryFile();
+  const gymRaw = readJsonFile<RawStoryGymFile>("story", "gen8-sword-gyms.json");
+  const gymByOrder = buildGymByOrderMap(gymRaw);
 
-  // 체육관 order -> gym 매핑 (버전별로 여러 개일 수 있음)
-  const gymByOrder = new Map<number, RawGymEntry[]>();
-  for (const gym of gymRaw.gyms) {
-    const existing = gymByOrder.get(gym.order) || [];
-    existing.push(gym);
-    gymByOrder.set(gym.order, existing);
-  }
-
-  // 스토리 포인트에 체육관 정보 매핑
-  // 체육관이 있는 section에 대해 gym/rival/elite4/champion 구분
   const storyPoints: StoryPoint[] = [];
-  const gymSections = new Set<string>();
 
   for (const sp of storyRaw.story_points) {
-    // 체육관 마을(town/city)이고 section에 "체육관"이 포함되면 gym 타입
-    const isGymSection = sp.section.includes("체육관");
-    const isChampionSection = sp.section.includes("챔피언");
+    const gymPoint = tryParseGymStoryPoint(sp, gymByOrder);
+    if (gymPoint) { storyPoints.push(gymPoint); continue; }
 
-    // 체육관 마을인 경우 체육관 스토리 포인트 생성
-    if (isGymSection && (sp.type === "town" || sp.type === "city")) {
-      // 해당 체육관 번호 추출
-      const gymNumMatch = sp.section.match(/(\d+)번째/);
-      if (gymNumMatch) {
-        const gymOrder = parseInt(gymNumMatch[1]);
-        const gyms = gymByOrder.get(gymOrder);
-        if (gyms && gyms.length > 0) {
-          // 첫 번째 체육관 (sword 기준) 사용
-          const gym = gyms[0];
-          const bossLevel = Math.max(...gym.pokemon.map((p) => p.level));
-          storyPoints.push({
-            id: `gym-${gymOrder}-${sp.location_id}`,
-            gameId: "sword-shield",
-            order: sp.order,
-            type: "gym" as StoryPointType,
-            bossType: [convertTypeToKo(gym.type)],
-            bossLevel,
-            name: `${sp.location_name} 체육관 (${gym.leader})`,
-          });
-          gymSections.add(sp.section);
-          continue;
-        }
-      }
-    }
+    const champPoint = tryParseChampionStoryPoint(sp);
+    if (champPoint) { storyPoints.push(champPoint); continue; }
 
-    // 챔피언컵인 경우
-    if (isChampionSection && sp.type === "city") {
-      storyPoints.push({
-        id: `champion-${sp.location_id}`,
-        gameId: "sword-shield",
-        order: sp.order,
-        type: "champion" as StoryPointType,
-        bossType: ["격투" as PokemonType], // 다누리 챔피언 - 혼합
-        bossLevel: 65,
-        name: `${sp.location_name} 챔피언컵`,
-      });
-      continue;
-    }
-
-    // 일반 스토리 포인트 (route, dungeon, wild_area 등)
-    storyPoints.push({
-      id: sp.location_id,
-      gameId: "sword-shield",
-      order: sp.order,
-      type: "rival" as StoryPointType, // 일반 지점은 rival로 표시
-      bossType: [],
-      bossLevel: 0,
-      name: sp.location_name,
-    });
+    storyPoints.push(createGenericStoryPoint(sp));
   }
 
   storyPointsCache = storyPoints;
@@ -478,7 +547,7 @@ function normalizeEncounterName(nameEn: string): string {
 export function loadEncounters(): Encounter[] {
   if (encountersCache) return encountersCache;
 
-  const raw = readJsonFile<RawEncounterFile>("encounter", "gen8-swsh-encounters.json");
+  const raw = readJsonFile<RawEncounterFile>("encounter", "gen8-sword-encounters.json");
   loadPokemonData(); // 캐시 보장
 
   // loadPokemonData에서 구축된 name_en -> id 캐시 재사용 (중복 파싱 방지)
@@ -537,26 +606,24 @@ export function loadEncounters(): Encounter[] {
 /**
  * 체육관 데이터 로드
  */
-export function loadGyms(): Gym[] {
+function loadGyms(): Gym[] {
   if (gymsCache) return gymsCache;
 
-  const raw = readJsonFile<RawStoryGymFile>("story", "gen8-swsh-gyms.json");
-  const pokemonJsonRaw = readJsonFile<RawPokemonFile>("pokemon", "gen8-swsh-pokemon.json");
+  const raw = readJsonFile<RawStoryGymFile>("story", "gen8-sword-gyms.json");
+  const entries = raw.battles ?? raw.gyms ?? [];
 
-  // name_en -> pokemon id 매핑
-  const nameToId = new Map<string, number>();
-  for (const p of pokemonJsonRaw.pokemon) {
-    nameToId.set(p.name_en.toLowerCase(), p.id);
-  }
+  // pokemon_id가 없는 경우를 위한 name_en → id 폴백 매핑
+  loadPokemonData(); // pokemonNameEnToIdCache 구축 보장
+  const fallbackNameToId = pokemonNameEnToIdCache ?? new Map<string, number>();
 
-  gymsCache = raw.gyms.map((g) => ({
+  gymsCache = entries.map((g) => ({
     id: `gym-${g.order}-${g.location}`,
-    name: `${g.leader} 체육관`,
+    name: `${g.leader_ko ?? g.leader} 체육관`,
     type: convertTypeToKo(g.type),
-    leader: g.leader,
+    leader: g.leader_ko ?? g.leader,
     pokemon: g.pokemon
       .map((p) => ({
-        id: nameToId.get(p.name_en.toLowerCase()) || 0,
+        id: p.pokemon_id ?? fallbackNameToId.get(p.name_en.toLowerCase()) ?? 0,
         level: p.level,
       }))
       .filter((p) => p.id !== 0),
@@ -603,10 +670,16 @@ export function loadTypeChart(): TypeChart {
 // 유틸리티 함수
 // ========================================
 
+/** storyPointOrder별 캐시 (#25 최적화) */
+const availablePokemonIdsCache = new Map<number, Set<number>>();
+
 /**
  * 특정 스토리 포인트까지 잡을 수 있는 포켓몬 ID 목록
  */
 export function getAvailablePokemonIds(storyPointOrder: number): Set<number> {
+  const cached = availablePokemonIdsCache.get(storyPointOrder);
+  if (cached) return cached;
+
   const encounters = loadEncounters();
   const storyData = loadStoryData();
 
@@ -618,8 +691,8 @@ export function getAvailablePokemonIds(storyPointOrder: number): Set<number> {
     }
   }
 
-  // story-order의 location_id도 추가
-  const storyRaw = readJsonFile<RawStoryFile>("story", "gen8-swsh-story-order.json");
+  // story의 location_id도 추가
+  const storyRaw = loadRawStoryFile();
   for (const sp of storyRaw.story_points) {
     if (sp.order <= storyPointOrder) {
       availableStoryPointIds.add(sp.location_id);
@@ -633,15 +706,29 @@ export function getAvailablePokemonIds(storyPointOrder: number): Set<number> {
     }
   }
 
+  availablePokemonIdsCache.set(storyPointOrder, availableIds);
   return availableIds;
 }
 
+/** pokemonId → Pokemon Map 캐시 (#24 최적화) */
+let pokemonByIdCache: Map<number, Pokemon> | null = null;
+
+function buildPokemonIdMap(allPokemon: Pokemon[]): Map<number, Pokemon> {
+  if (pokemonByIdCache) return pokemonByIdCache;
+  pokemonByIdCache = new Map();
+  for (const p of allPokemon) {
+    pokemonByIdCache.set(p.id, p);
+  }
+  return pokemonByIdCache;
+}
+
 /**
- * 포켓몬 ID로 포켓몬 데이터 조회
+ * 포켓몬 ID로 포켓몬 데이터 조회 — O(1) Map 조회
  */
 export function getPokemonById(id: number): Pokemon | undefined {
   const allPokemon = loadPokemonData();
-  return allPokemon.find((p) => p.id === id);
+  const idMap = buildPokemonIdMap(allPokemon);
+  return idMap.get(id);
 }
 
 /**
@@ -649,9 +736,18 @@ export function getPokemonById(id: number): Pokemon | undefined {
  */
 export function clearCache(): void {
   pokemonCache = null;
+  pokemonCacheVersion = null;
+  pokemonNameEnToIdCache = null;
   movesCache = null;
+  movesCacheVersion = null;
   storyPointsCache = null;
   encountersCache = null;
   gymsCache = null;
   typeChartCache = null;
+  pokemonByIdCache = null;
+  availablePokemonIdsCache.clear();
+  rawPokemonCache = null;
+  rawPokemonCacheVersion = null;
+  rawStoryCache = null;
+  abilityScoresCache = null;
 }

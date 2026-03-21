@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { requireAuth } from "@/lib/auth-guard";
 import { getApiErrorMessage } from "@/lib/api-error";
+import { withRateLimit } from "@/lib/rate-limit";
 
 /** 유저당 최대 저장 파티 수 */
 const MAX_PARTIES = 30;
@@ -13,7 +14,7 @@ const MAX_PARTIES = 30;
 /** 허용되는 game_id 목록 */
 const VALID_GAME_IDS = ["sword-shield"];
 
-export async function GET(request: NextRequest) {
+export const GET = withRateLimit(async (request: NextRequest) => {
   try {
     const auth = await requireAuth();
     if (auth.error) return auth.error;
@@ -62,9 +63,9 @@ export async function GET(request: NextRequest) {
     const message = getApiErrorMessage(error, "파티 목록을 불러오는 중 오류가 발생했습니다.");
     return NextResponse.json({ error: message }, { status: 500 });
   }
-}
+});
 
-export async function POST(request: NextRequest) {
+export const POST = withRateLimit(async (request: NextRequest) => {
   try {
     const auth = await requireAuth();
     if (auth.error) return auth.error;
@@ -184,4 +185,4 @@ export async function POST(request: NextRequest) {
     const message = getApiErrorMessage(error, "파티 저장 중 오류가 발생했습니다.");
     return NextResponse.json({ error: message }, { status: 500 });
   }
-}
+});

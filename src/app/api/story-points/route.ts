@@ -2,11 +2,12 @@
  * GET /api/story-points
  * 스토리 포인트 목록 반환 (gym 타입만 필터링)
  */
-import { type NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { loadStoryData } from "@/lib/data-loader";
 import { getApiErrorMessage } from "@/lib/api-error";
+import { withRateLimit } from "@/lib/rate-limit";
 
-export async function GET(request: NextRequest) {
+export const GET = withRateLimit(async (request: NextRequest) => {
   try {
     const gameId = request.nextUrl.searchParams.get("gameId");
     const storyPoints = loadStoryData();
@@ -25,4 +26,4 @@ export async function GET(request: NextRequest) {
     const message = getApiErrorMessage(error, "스토리 포인트 데이터를 로드하는 중 오류가 발생했습니다.");
     return NextResponse.json({ error: message }, { status: 500 });
   }
-}
+});

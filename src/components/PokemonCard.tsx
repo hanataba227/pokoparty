@@ -1,21 +1,32 @@
 'use client';
 
+import { memo } from 'react';
 import Image from 'next/image';
-import type { Pokemon, ScoringBreakdown } from '@/types/pokemon';
+import Link from 'next/link';
+import type { Pokemon, ScoringBreakdown, DetailedReason } from '@/types/pokemon';
 import { getFinalScore } from '@/lib/score-utils';
 import { getSpriteUrl } from '@/lib/sprite';
 import TypeBadge from './TypeBadge';
 import { UI } from '@/lib/ui-tokens';
 
+/** 카테고리별 아이콘/라벨 매핑 */
+const REASON_LABELS: Record<DetailedReason['category'], { icon: string; label: string }> = {
+  move: { icon: '⚔️', label: '기술' },
+  evolution: { icon: '🔄', label: '진화' },
+  coverage: { icon: '🎯', label: '커버리지' },
+  tip: { icon: '💡', label: '팁' },
+};
+
 interface PokemonCardProps {
   pokemon: Pokemon;
   score?: ScoringBreakdown;
+  detailedReasons?: DetailedReason[];
   isFixed?: boolean;
   compact?: boolean;
   onClick?: () => void;
 }
 
-export default function PokemonCard({ pokemon, score, isFixed, compact, onClick }: PokemonCardProps) {
+const PokemonCard = memo(function PokemonCard({ pokemon, score, detailedReasons, isFixed, compact, onClick }: PokemonCardProps) {
   const spriteUrl = getSpriteUrl(pokemon.id);
   const totalScore = score ? Math.round(getFinalScore(score)) : null;
 
@@ -37,22 +48,22 @@ export default function PokemonCard({ pokemon, score, isFixed, compact, onClick 
         </div>
       )}
 
-      {/* 포켓몬 이미지 */}
-      <div className={`${compact ? 'w-12 h-12 sm:w-16 sm:h-16 mb-1.5' : 'w-20 h-20 mb-3'} mx-auto relative`}>
-        <Image
-          src={spriteUrl}
-          alt={pokemon.name}
-          width={compact ? 64 : 80}
-          height={compact ? 64 : 80}
-          className="w-full h-full object-contain"
-          unoptimized
-        />
-      </div>
-
-      {/* 이름 + 번호 */}
-      <h3 className={`text-center font-bold text-slate-900 ${compact ? 'text-xs sm:text-sm' : 'text-lg'}`}>
-        {pokemon.name}
-      </h3>
+      {/* 포켓몬 이미지 + 이름 (클릭 시 도감 페이지로 이동) */}
+      <Link href={`/pokemon/${pokemon.id}`} onClick={(e) => e.stopPropagation()}>
+        <div className={`${compact ? 'w-12 h-12 sm:w-16 sm:h-16 mb-1.5' : 'w-20 h-20 mb-3'} mx-auto relative`}>
+          <Image
+            src={spriteUrl}
+            alt={pokemon.name}
+            width={compact ? 64 : 80}
+            height={compact ? 64 : 80}
+            className="w-full h-full object-contain"
+            unoptimized
+          />
+        </div>
+        <h3 className={`text-center font-bold text-slate-900 hover:text-indigo-600 transition-colors ${compact ? 'text-xs sm:text-sm' : 'text-lg'}`}>
+          {pokemon.name}
+        </h3>
+      </Link>
       {!compact && (
         <p className="text-center text-slate-400 text-sm">
           #{String(pokemon.id).padStart(3, '0')}
@@ -101,9 +112,72 @@ export default function PokemonCard({ pokemon, score, isFixed, compact, onClick 
                 <span className="font-medium">{score.evolutionEase}</span>
               </div>
             </div>
+
+            {/* 상세 추천 이유 (진화/팁만 표시) */}
+            {detailedReasons && detailedReasons.filter((r) => r.category !== 'move' && r.category !== 'coverage').length > 0 && (
+              <div className="mt-2.5 pt-2.5 border-t border-slate-100 space-y-1.5">
+                {detailedReasons
+                  .filter((r) => r.category !== 'move' && r.category !== 'coverage')
+                  .map((reason, idx) => (
+                    <DetailedReasonRow key={idx} reason={reason} />
+                  ))}
+              </div>
+            )}
           </div>
         )
       )}
+    </div>
+  );
+});
+
+export default PokemonCard;
+
+/** 개별 상세 이유 행 렌더링 */
+function DetailedReasonRow({ reason }: { reason: DetailedReason }) {
+  const { icon, label } = REASON_LABELS[reason.category];
+  const d = reason.details;
+
+  return (
+    <div className="flex items-start gap-1.5 text-[11px]">
+      <span className="shrink-0 text-[10px] leading-4" title={label}>{icon}</span>
+      <div className="min-w-0">
+        {reason.category === 'move' && d?.moveName ? (
+          <span className="text-slate-600">
+            {d.isStab && <span className="text-amber-500 font-bold mr-0.5">★</span>}
+            <span className="font-medium text-slate-700">{d.moveName}</span>
+            {d.moveType && (
+              <span className="ml-1 inline-flex align-middle">
+                <TypeBadge type={d.moveType} size="sm" />
+              </span>
+            )}
+            {d.movePower != null && d.movePower > 0 && (
+              <span className="ml-1 text-slate-400">위력{d.movePower}</span>
+            )}
+            {d.learnLevel != null && (
+              <span className="ml-1 text-indigo-500">Lv{d.learnLevel}</span>
+            )}
+          </span>
+        ) : reason.category === 'evolution' && d?.evolutionChain ? (
+          <span className="text-slate-600">
+            {d.evolutionLevel != null && (
+              <span className="font-medium text-indigo-500 mr-1">Lv{d.evolutionLevel}</span>
+            )}
+            <span>최종진화</span>
+            <span className="ml-1 text-slate-400">({d.evolutionChain})</span>
+          </span>
+        ) : reason.category === 'coverage' && d?.coveredTypes && d.coveredTypes.length > 0 ? (
+          <span className="text-slate-600">
+            <span className="mr-1">유리한 상대:</span>
+            <span className="inline-flex flex-wrap gap-0.5">
+              {d.coveredTypes.map((t) => (
+                <TypeBadge key={t} type={t} size="sm" />
+              ))}
+            </span>
+          </span>
+        ) : (
+          <span className="text-slate-500">{reason.summary}</span>
+        )}
+      </div>
     </div>
   );
 }

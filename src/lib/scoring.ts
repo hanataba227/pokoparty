@@ -20,6 +20,7 @@ import type {
   PartyRecommendation,
   RecommendFilters,
   AttackType,
+  DetailedReason,
 } from "@/types/pokemon";
 import {
   getTypeEffectiveness,
@@ -33,43 +34,13 @@ import {
   loadEncounters,
   getMovesForPokemon,
   getAvailablePokemonIds,
+  loadTypeChart,
+  getPokemonById,
+  loadAbilityScores,
+  STARTER_IDS,
 } from "./data-loader";
 import { getFinalScore } from "./score-utils";
 import { classifyAttackType } from "./weight-config";
-
-// ========================================
-// 특성 점수 데이터 로드
-// ========================================
-
-import fs from "fs";
-import path from "path";
-
-interface AbilityScoreEntry {
-  name: string;
-  name_ko: string;
-  category: string;
-  score: number;
-  description: string;
-}
-
-interface AbilityScoresFile {
-  abilities: Record<string, AbilityScoreEntry>;
-}
-
-let abilityScoresCache: Record<string, AbilityScoreEntry> | null = null;
-
-function loadAbilityScores(): Record<string, AbilityScoreEntry> {
-  if (abilityScoresCache) return abilityScoresCache;
-  const filePath = path.join(process.cwd(), "data", "scoring", "ability-scores.json");
-  if (!fs.existsSync(filePath)) {
-    abilityScoresCache = {};
-    return abilityScoresCache;
-  }
-  const raw = fs.readFileSync(filePath, "utf-8");
-  const data = JSON.parse(raw) as AbilityScoresFile;
-  abilityScoresCache = data.abilities;
-  return abilityScoresCache;
-}
 
 // ========================================
 // 타입 상성 유틸리티 (type-calc.ts 재사용)
@@ -175,17 +146,25 @@ export function scoreMoveCoverage(pokemon: Pokemon, typeChart: TypeChart): numbe
 // 3. 입수시기 (acquisition) — 비선형 곡선
 // ========================================
 
-/** 진화 전 체인을 역추적하여 pre-evo ID 목록 반환 */
-function getPreEvoChain(pokemonId: number, allPokemon: Pokemon[]): number[] {
-  // 역방향 맵: evolved_id → pre_evo_id
-  const preEvoMap = new Map<number, number>();
+/** preEvo 역방향 맵 캐시 (evolved_id → pre_evo_id) */
+let preEvoMapCache: Map<number, number> | null = null;
+
+function buildPreEvoMap(allPokemon: Pokemon[]): Map<number, number> {
+  if (preEvoMapCache) return preEvoMapCache;
+  preEvoMapCache = new Map();
   for (const p of allPokemon) {
     if (p.evolutions) {
       for (const evo of p.evolutions) {
-        preEvoMap.set(evo.to, p.id);
+        preEvoMapCache.set(evo.to, p.id);
       }
     }
   }
+  return preEvoMapCache;
+}
+
+/** 진화 전 체인을 역추적하여 pre-evo ID 목록 반환 */
+function getPreEvoChain(pokemonId: number, allPokemon: Pokemon[]): number[] {
+  const preEvoMap = buildPreEvoMap(allPokemon);
   const chain: number[] = [];
   let cur = pokemonId;
   while (preEvoMap.has(cur)) {
@@ -221,7 +200,6 @@ function buildEarliestMap(allPokemon: Pokemon[]): Map<number, number> {
   }
 
   // 스타터: order=1
-  const STARTER_IDS = [810, 811, 812, 813, 814, 815, 816, 817, 818];
   for (const id of STARTER_IDS) {
     if (!earliest.has(id)) earliest.set(id, 1);
   }
@@ -241,6 +219,15 @@ function buildEarliestMap(allPokemon: Pokemon[]): Map<number, number> {
 
   earliestMapCache = earliest;
   return earliest;
+}
+
+// ========================================
+// 캐시 초기화
+// ========================================
+
+export function clearScoringCache(): void {
+  earliestMapCache = null;
+  preEvoMapCache = null;
 }
 
 const TOTAL_STORY_POINTS = 28; // scoring-utils.js와 동일
@@ -320,7 +307,7 @@ export function scoreEvolutionEase(pokemon: Pokemon, bossLevel = 50): number {
   // 가장 어려운 진화 단계(bottleneck) 기준 + 단계 수 소폭 패널티
   let worstScore = 100;
   for (const preId of chain) {
-    const preEvo = allPokemon.find((p) => p.id === preId);
+    const preEvo = getPokemonById(preId);
     if (!preEvo?.evolutions) continue;
     const evo = preEvo.evolutions[0];
     let stepScore = 100;
@@ -368,10 +355,6 @@ export function scoreAbilityBonus(pokemon: Pokemon): number {
 // 종합 점수 계산
 // ========================================
 
-export function getAttackType(pokemon: Pokemon): AttackType {
-  return classifyAttackType(pokemon.stats.atk, pokemon.stats.spa);
-}
-
 export function calculateTotalScore(
   pokemon: Pokemon,
   _currentParty: Pokemon[],
@@ -392,51 +375,242 @@ export function calculateTotalScore(
 // 추천 이유 생성
 // ========================================
 
+// ========================================
+// 진화 체인 문자열 구성 헬퍼
+// ========================================
+
+/** 포켓몬 ID로부터 최종 진화까지의 체인 구성 (이름 → 이름 → ...) */
+function buildEvolutionChainString(pokemon: Pokemon): { chain: string; finalLevel?: number } {
+  const allPokemon = loadPokemonData();
+  const preChain = getPreEvoChain(pokemon.id, allPokemon);
+
+  // 역추적 체인을 역순으로 (1단계 → 최종)
+  const orderedIds = [...preChain.reverse(), pokemon.id];
+
+  // 현재 포켓몬이 아직 진화 가능하면 진화 후까지 추가
+  let current: Pokemon | undefined = pokemon;
+  let finalLevel: number | undefined;
+  while (current?.evolutions && current.evolutions.length > 0) {
+    const evo = current.evolutions[0];
+    orderedIds.push(evo.to);
+    if (evo.method === "level" && evo.level) {
+      finalLevel = evo.level;
+    }
+    current = getPokemonById(evo.to);
+  }
+
+  // pre-evo 체인의 진화 레벨 중 최대값을 최종 진화 레벨로
+  if (!finalLevel) {
+    for (const preId of preChain) {
+      const preEvo = getPokemonById(preId);
+      if (preEvo?.evolutions) {
+        for (const evo of preEvo.evolutions) {
+          if (evo.method === "level" && evo.level) {
+            finalLevel = Math.max(finalLevel ?? 0, evo.level);
+          }
+        }
+      }
+    }
+  }
+
+  const names = orderedIds
+    .map((id) => getPokemonById(id)?.name ?? `#${id}`)
+    .filter((name, idx, arr) => arr.indexOf(name) === idx); // 중복 제거
+
+  return { chain: names.join(" → "), finalLevel };
+}
+
+// ========================================
+// 추천 이유 생성 (상세)
+// ========================================
+
+export function generateDetailedReasons(
+  pokemon: Pokemon,
+  breakdown: ScoringBreakdown,
+  storyPoint?: StoryPoint
+): DetailedReason[] {
+  const detailedReasons: DetailedReason[] = [];
+  const typeChart = loadTypeChart();
+  const atkType = classifyAttackType(pokemon.stats.atk, pokemon.stats.spa);
+  const moves = getMovesForPokemon(pokemon.id);
+  const attackMoves = moves.filter((m) => m.power > 0);
+
+  // --- 1. 핵심 기술 이유 (category: 'move') ---
+
+  // 가장 강한 STAB 기술 찾기
+  const stabMoves = attackMoves.filter((m) => {
+    if (atkType === "physical") return m.category === "물리" && pokemon.types.includes(m.type);
+    if (atkType === "special") return m.category === "특수" && pokemon.types.includes(m.type);
+    return pokemon.types.includes(m.type); // dual
+  });
+
+  if (stabMoves.length > 0) {
+    const bestStab = stabMoves.reduce((best, m) => m.power > best.power ? m : best, stabMoves[0]);
+    detailedReasons.push({
+      category: 'move',
+      summary: `${bestStab.name} (Lv${bestStab.learnLevel}, 위력 ${bestStab.power}) — 강력한 자속 기술`,
+      details: {
+        moveName: bestStab.name,
+        moveType: bestStab.type,
+        movePower: bestStab.power,
+        learnLevel: bestStab.learnLevel,
+        isStab: true,
+      },
+    });
+  }
+
+  // 커버리지 기술 (STAB이 아니지만 위력 높은 기술, 상위 1개)
+  const coverageMoves = attackMoves
+    .filter((m) => !pokemon.types.includes(m.type) && m.power >= 60)
+    .filter((m) => {
+      if (atkType === "physical") return m.category === "물리";
+      if (atkType === "special") return m.category === "특수";
+      return true;
+    })
+    .sort((a, b) => b.power - a.power);
+
+  if (coverageMoves.length > 0) {
+    const bestCoverage = coverageMoves[0];
+    detailedReasons.push({
+      category: 'move',
+      summary: `${bestCoverage.name} (Lv${bestCoverage.learnLevel}, 위력 ${bestCoverage.power}) — 커버리지 기술`,
+      details: {
+        moveName: bestCoverage.name,
+        moveType: bestCoverage.type,
+        movePower: bestCoverage.power,
+        learnLevel: bestCoverage.learnLevel,
+        isStab: false,
+      },
+    });
+  }
+
+  // --- 2. 진화 이유 (category: 'evolution') ---
+
+  const isFinalForm = !pokemon.evolutions || pokemon.evolutions.length === 0;
+  const allPokemon = loadPokemonData();
+  const preChain = getPreEvoChain(pokemon.id, allPokemon);
+  if (isFinalForm && preChain.length > 0) {
+    // 최종 진화형이고 진화 체인이 있는 경우
+    const { chain, finalLevel } = buildEvolutionChainString(pokemon);
+    const summary = finalLevel
+      ? `이미 최종 진화형으로 바로 활약 가능 (${chain})`
+      : `이미 최종 진화형으로 바로 활약 가능`;
+    detailedReasons.push({
+      category: 'evolution',
+      summary,
+      details: {
+        evolutionChain: chain,
+        evolutionLevel: finalLevel,
+      },
+    });
+  } else if (isFinalForm && preChain.length === 0) {
+    // 진화 없는 단일 포켓몬
+    detailedReasons.push({
+      category: 'evolution',
+      summary: '진화가 없는 포켓몬으로 바로 활약 가능',
+    });
+  } else if (pokemon.evolutions && pokemon.evolutions.length > 0) {
+    // 아직 진화 가능
+    const { chain, finalLevel } = buildEvolutionChainString(pokemon);
+    const summary = finalLevel
+      ? `Lv${finalLevel}에 최종 진화 (${chain})`
+      : `진화 가능 (${chain})`;
+    detailedReasons.push({
+      category: 'evolution',
+      summary,
+      details: {
+        evolutionChain: chain,
+        evolutionLevel: finalLevel,
+      },
+    });
+  }
+
+  // --- 3. 타입 커버리지 이유 (category: 'coverage') ---
+
+  const coveredTypes: PokemonType[] = [];
+  const moveTypes = new Set(attackMoves.map((m) => m.type));
+  for (const defType of ALL_TYPES) {
+    for (const moveType of moveTypes) {
+      if (getTypeEffectiveness(moveType, defType, typeChart) > 1) {
+        coveredTypes.push(defType);
+        break;
+      }
+    }
+  }
+
+  if (coveredTypes.length > 0) {
+    detailedReasons.push({
+      category: 'coverage',
+      summary: `${coveredTypes.join("/")} 타입 상대에 유리`,
+      details: {
+        coveredTypes,
+      },
+    });
+  }
+
+  // --- 4. 운용 팁 (category: 'tip') ---
+
+  // 스탯 기반 역할 추천
+  const roleLabel = atkType === "physical" ? "물리" : atkType === "special" ? "특수" : "물리/특수 혼합";
+  const mainStat = atkType === "physical" ? pokemon.stats.atk : atkType === "special" ? pokemon.stats.spa : Math.max(pokemon.stats.atk, pokemon.stats.spa);
+  if (mainStat >= 80) {
+    detailedReasons.push({
+      category: 'tip',
+      summary: `${roleLabel} 공격형 — ${roleLabel} 기술 중심으로 운용 추천`,
+    });
+  }
+
+  // 약점 주의
+  const weaknesses = getTypeWeaknesses(pokemon.types, typeChart);
+  if (weaknesses.length >= 4) {
+    detailedReasons.push({
+      category: 'tip',
+      summary: `약점이 ${weaknesses.length}개로 많으니 교체 운용 추천 (${weaknesses.slice(0, 4).join("/")}${weaknesses.length > 4 ? " 등" : ""})`,
+    });
+  }
+
+  // 스토리 포인트 관련 팁
+  if (storyPoint && storyPoint.bossType.length > 0 && breakdown.combatFitness >= 60) {
+    detailedReasons.push({
+      category: 'tip',
+      summary: `${storyPoint.name}의 ${storyPoint.bossType.join("/")} 타입 상대에 유리합니다`,
+    });
+  }
+
+  // 빠른 스피드 팁
+  if (pokemon.stats.spe >= 100) {
+    detailedReasons.push({
+      category: 'tip',
+      summary: `스피드 ${pokemon.stats.spe}으로 대부분의 상대보다 빠르게 행동`,
+    });
+  }
+
+  return detailedReasons;
+}
+
+/** 기존 호환용 reasons 생성 (detailedReasons에서 summary 추출) */
 function generateReasons(
   pokemon: Pokemon,
   breakdown: ScoringBreakdown,
   storyPoint?: StoryPoint
-): string[] {
-  const reasons: string[] = [];
+): { reasons: string[]; detailedReasons: DetailedReason[] } {
+  const detailedReasons = generateDetailedReasons(pokemon, breakdown, storyPoint);
 
-  if (breakdown.combatFitness >= 70) {
-    reasons.push("스탯 배분이 효율적이고 공격형에 맞는 기술을 보유합니다");
-  }
-  if (breakdown.acquisition >= 60) {
-    reasons.push("스토리 초반부터 잡을 수 있어 충분히 키울 시간이 있습니다");
-  }
-  if (breakdown.stabPower >= 70) {
-    reasons.push("강력한 자속 기술을 일찍 배웁니다");
-  }
-  if (breakdown.moveCoverage >= 50) {
-    reasons.push("다양한 타입을 효과적으로 견제합니다");
-  }
-  if (breakdown.evolutionEase >= 80) {
-    reasons.push("진화가 쉽거나 이미 최종 진화형입니다");
-  }
-
-  if (storyPoint && storyPoint.bossType.length > 0 && breakdown.combatFitness >= 60) {
-    reasons.push(
-      `${storyPoint.name}의 ${storyPoint.bossType.join("/")} 타입 상대에 유리합니다`
-    );
-  }
+  // detailedReasons에서 summary를 추출하여 기존 reasons 호환
+  const reasons = detailedReasons.map((r) => r.summary);
 
   if (reasons.length === 0) {
     reasons.push("파티 구성에 안정적인 선택입니다");
   }
 
-  return reasons;
+  return { reasons, detailedReasons };
 }
 
 // ========================================
 // 필터 관련 상수
 // ========================================
 
-const STARTER_LINES = new Set([
-  810, 811, 812,
-  813, 814, 815,
-  816, 817, 818,
-]);
+const STARTER_LINES = new Set(STARTER_IDS);
 
 function applyFilters(candidates: Pokemon[], filters?: RecommendFilters): Pokemon[] {
   if (!filters) return candidates;
@@ -467,20 +641,28 @@ function applyFilters(candidates: Pokemon[], filters?: RecommendFilters): Pokemo
 }
 
 // ========================================
-// 파티 추천
+// 파티 추천 — 서브함수 (#17 리팩토링)
 // ========================================
 
-export function recommendParty(
-  storyPoint: StoryPoint | undefined,
-  fixedPokemon: Pokemon[],
-  typeChart: TypeChart,
-  allPokemon: Pokemon[],
-  slotsToFill?: number,
-  filters?: RecommendFilters
-): PartyRecommendation[] {
-  const maxSlots = slotsToFill ?? (6 - fixedPokemon.length);
-  const fixedIds = new Set(fixedPokemon.map((p) => p.id));
+interface ScoredCandidate {
+  pokemon: Pokemon;
+  breakdown: ScoringBreakdown;
+  finalScore: number;
+  /** 캐시: getFinalScore(breakdown, atkType) — 파티 무관 기본 점수 */
+  baseScore: number;
+  /** 캐시: 공격 커버리지 기여도 0 타입 보유 여부 (포켓몬 고유) */
+  hasZeroCoverage: boolean;
+  /** 캐시: BST 보정 배수 (포켓몬 고유) */
+  bstMultiplier: number;
+}
 
+/** 후보 포켓몬 필터링: 스토리 시점별 입수 가능 + 고정 파티 제외 */
+function filterCandidates(
+  storyPoint: StoryPoint | undefined,
+  fixedIds: Set<number>,
+  allPokemon: Pokemon[],
+  filters?: RecommendFilters
+): Pokemon[] {
   let candidates: Pokemon[];
   if (storyPoint) {
     const availableIds = getAvailablePokemonIds(storyPoint.order);
@@ -495,21 +677,112 @@ export function recommendParty(
     ...filters,
     finalOnly: filters?.finalOnly !== false ? true : false,
   };
-  candidates = applyFilters(candidates, effectiveFilters);
+  return applyFilters(candidates, effectiveFilters);
+}
 
-  // 각 후보 점수 계산
-  const scored: {
-    pokemon: Pokemon;
-    breakdown: ScoringBreakdown;
-    finalScore: number;
-  }[] = [];
-
+/** 후보 포켓몬 초기 점수 계산 + 포켓몬 고유 속성 캐시 */
+function scoreInitialCandidates(
+  candidates: Pokemon[],
+  fixedPokemon: Pokemon[],
+  storyPoint: StoryPoint | undefined,
+  typeChart: TypeChart
+): ScoredCandidate[] {
+  const scored: ScoredCandidate[] = [];
   for (const candidate of candidates) {
     const breakdown = calculateTotalScore(candidate, fixedPokemon, storyPoint, typeChart);
-    const attackType = getAttackType(candidate);
-    const finalScore = getFinalScore(breakdown, attackType);
-    scored.push({ pokemon: candidate, breakdown, finalScore });
+    const attackType = classifyAttackType(candidate.stats.atk, candidate.stats.spa);
+    const baseScore = getFinalScore(breakdown, attackType);
+
+    // 포켓몬 고유 속성 사전 계산 (reevaluateCandidates에서 매 슬롯 반복 방지)
+    const hasZeroCoverage = candidate.types.some((pokemonType) => {
+      return !ALL_TYPES.some(
+        (defType) => getTypeEffectiveness(pokemonType, defType, typeChart) > 1
+      );
+    });
+
+    const { hp, atk, def: d, spa, spd, spe } = candidate.stats;
+    const bst = hp + atk + d + spa + spd + spe;
+    const bstMultiplier = Math.min(1.20, Math.max(0.75, 1.0 + (bst - 480) / 300));
+
+    scored.push({
+      pokemon: candidate,
+      breakdown,
+      finalScore: baseScore,
+      baseScore,
+      hasZeroCoverage,
+      bstMultiplier,
+    });
   }
+  return scored;
+}
+
+/** 슬롯 채우기 시 후보 재평가: 타입 중복/커버리지/BST 패널티 적용
+ *
+ * 성능 최적화: calculateTotalScore()의 6칼럼 서브스코어는 파티 구성과 무관하므로
+ * 초기 계산(scoreInitialCandidates)에서 캐시된 breakdown을 재사용한다.
+ * 파티 컨텍스트에 따라 달라지는 패널티/보너스만 재계산하여 ~2,400회 → ~400회로 절감.
+ */
+function reevaluateCandidates(
+  validScored: ScoredCandidate[],
+  currentParty: Pokemon[],
+  _storyPoint: StoryPoint | undefined,
+  typeChart: TypeChart
+): ScoredCandidate[] {
+  // 현재 파티의 타입을 Set으로 미리 수집 (O(1) lookup)
+  const partyTypeSet = new Set<PokemonType>();
+  for (const p of currentParty) {
+    for (const t of p.types) {
+      partyTypeSet.add(t);
+    }
+  }
+
+  // 현재 파티 멤버 ID를 Set으로 수집 (O(1) lookup)
+  const partyIdSet = new Set<number>();
+  for (const p of currentParty) {
+    partyIdSet.add(p.id);
+  }
+
+  return validScored
+    .filter((s) => !partyIdSet.has(s.pokemon.id))
+    .map((s) => {
+      // 캐시된 baseScore 재사용 — calculateTotalScore/getFinalScore 재호출 불필요
+      let finalScore = s.baseScore;
+
+      // 타입 중복 패널티 (파티 컨텍스트 의존 — 유일한 재계산 항목)
+      const hasDuplicateType = s.pokemon.types.some((t) => partyTypeSet.has(t));
+      if (hasDuplicateType) {
+        finalScore *= 0.9;
+      }
+
+      // 캐시된 zero-coverage 패널티 적용
+      if (s.hasZeroCoverage) {
+        finalScore *= 0.85;
+      }
+
+      // 캐시된 BST 보정 적용
+      finalScore *= s.bstMultiplier;
+
+      return { ...s, finalScore };
+    });
+}
+
+// ========================================
+// 파티 추천
+// ========================================
+
+export function recommendParty(
+  storyPoint: StoryPoint | undefined,
+  fixedPokemon: Pokemon[],
+  typeChart: TypeChart,
+  allPokemon: Pokemon[],
+  slotsToFill?: number,
+  filters?: RecommendFilters
+): PartyRecommendation[] {
+  const maxSlots = slotsToFill ?? (6 - fixedPokemon.length);
+  const fixedIds = new Set(fixedPokemon.map((p) => p.id));
+
+  const candidates = filterCandidates(storyPoint, fixedIds, allPokemon, filters);
+  const scored = scoreInitialCandidates(candidates, fixedPokemon, storyPoint, typeChart);
 
   // 입수 불가 포켓몬 제외
   const validScored = storyPoint
@@ -523,46 +796,12 @@ export function recommendParty(
   const currentParty = [...fixedPokemon];
 
   for (let slot = 0; slot < maxSlots && validScored.length > 0; slot++) {
-    const reevaluated = validScored
-      .filter((s) => !currentParty.some((p) => p.id === s.pokemon.id))
-      .map((s) => {
-        const breakdown = calculateTotalScore(s.pokemon, currentParty, storyPoint, typeChart);
-        const atkType = getAttackType(s.pokemon);
-        let finalScore = getFinalScore(breakdown, atkType);
-
-        // 타입 중복 패널티
-        const duplicateTypes = s.pokemon.types.filter((t) =>
-          currentParty.some((p) => p.types.includes(t))
-        );
-        if (duplicateTypes.length > 0) {
-          finalScore *= 0.9;
-        }
-
-        // 공격 커버리지 기여도 0 패널티 (노말 등)
-        const hasZeroCoverage = s.pokemon.types.some((pokemonType) => {
-          return !ALL_TYPES.some(
-            (defType) => getTypeEffectiveness(pokemonType, defType, typeChart) > 1
-          );
-        });
-        if (hasZeroCoverage) {
-          finalScore *= 0.85;
-        }
-
-        // BST 보정: 종족값 총합 기반 연속 함수 (480 중심)
-        // BST 400→0.75, 456→0.92, 480→1.0, 530→1.17, 600→1.20(cap)
-        const { hp, atk, def: d, spa, spd, spe } = s.pokemon.stats;
-        const bst = hp + atk + d + spa + spd + spe;
-        const bstMultiplier = Math.min(1.20, Math.max(0.75, 1.0 + (bst - 480) / 300));
-        finalScore *= bstMultiplier;
-
-        return { ...s, breakdown, finalScore };
-      });
-
+    const reevaluated = reevaluateCandidates(validScored, currentParty, storyPoint, typeChart);
     reevaluated.sort((a, b) => b.finalScore - a.finalScore);
 
     if (reevaluated.length > 0) {
       const best = reevaluated[0];
-      const reasons = generateReasons(best.pokemon, best.breakdown, storyPoint);
+      const { reasons, detailedReasons } = generateReasons(best.pokemon, best.breakdown, storyPoint);
 
       recommendations.push({
         pokemon: best.pokemon,
@@ -570,6 +809,7 @@ export function recommendParty(
         reasons,
         role: classifyRole(best.pokemon),
         breakdown: best.breakdown,
+        detailedReasons,
       });
 
       currentParty.push(best.pokemon);

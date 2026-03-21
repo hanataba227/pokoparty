@@ -8,6 +8,7 @@ import { getSpriteUrl } from '@/lib/sprite';
 import TypeBadge from '@/components/TypeBadge';
 import type { PokemonType } from '@/types/pokemon';
 import { GEN_RANGES } from '@/lib/pokemon-gen';
+import { cachedFetch } from '@/lib/client-cache';
 
 interface PokedexEntry {
   id: number;
@@ -65,10 +66,12 @@ export default function PokedexList({ pokemon, defaultPopularIds }: PokedexListP
   const [popularIds, setPopularIds] = useState<number[]>(defaultPopularIds);
   const searchRef = useRef<HTMLDivElement>(null);
 
-  // 마운트 시 인기 포켓몬 API 호출
+  // 마운트 시 인기 포켓몬 API 호출 (캐시 적용)
   useEffect(() => {
-    fetch('/api/popular-pokemon?limit=8')
-      .then((res) => res.json())
+    cachedFetch('popular-pokemon', async () => {
+      const res = await fetch('/api/popular-pokemon?limit=8');
+      return res.json();
+    })
       .then((data) => {
         if (data.popular?.length > 0) {
           setPopularIds(data.popular.map((p: { pokemonId: number }) => p.pokemonId));

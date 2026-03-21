@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { X, Search } from 'lucide-react';
 import type { Pokemon, PokemonType } from '@/types/pokemon';
 import { ALL_TYPES } from '@/lib/type-calc';
@@ -15,6 +15,9 @@ interface PokemonSearchModalProps {
   availablePokemon: Pokemon[];
 }
 
+/** 한 번에 렌더링할 항목 수 (행 단위) */
+const PAGE_SIZE = 30;
+
 export default function PokemonSearchModal({
   isOpen,
   onClose,
@@ -23,6 +26,8 @@ export default function PokemonSearchModal({
 }: PokemonSearchModalProps) {
   const [searchName, setSearchName] = useState('');
   const [selectedType, setSelectedType] = useState<PokemonType | null>(null);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const filteredPokemon = useMemo(() => {
     return availablePokemon.filter((p) => {
@@ -31,6 +36,40 @@ export default function PokemonSearchModal({
       return matchesName && matchesType;
     });
   }, [availablePokemon, searchName, selectedType]);
+
+  // 필터 변경 시 visible count 리셋
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = 0;
+    }
+  }, [searchName, selectedType]);
+
+  // 모달 열릴 때 리셋
+  useEffect(() => {
+    if (isOpen) {
+      setVisibleCount(PAGE_SIZE);
+    }
+  }, [isOpen]);
+
+  const visiblePokemon = useMemo(
+    () => filteredPokemon.slice(0, visibleCount),
+    [filteredPokemon, visibleCount]
+  );
+
+  const hasMore = visibleCount < filteredPokemon.length;
+
+  // 스크롤 이벤트로 무한 스크롤
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el || !hasMore) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = el;
+    // 하단 200px 이내에 도달하면 추가 로드
+    if (scrollHeight - scrollTop - clientHeight < 200) {
+      setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, filteredPokemon.length));
+    }
+  }, [hasMore, filteredPokemon.length]);
 
   if (!isOpen) return null;
 
@@ -109,15 +148,19 @@ export default function PokemonSearchModal({
           </div>
         </div>
 
-        {/* 포켓몬 그리드 */}
-        <div className="flex-1 overflow-y-auto p-6">
+        {/* 포켓몬 그리드 — 무한 스크롤 가상화 */}
+        <div
+          ref={scrollRef}
+          className="flex-1 overflow-y-auto p-6"
+          onScroll={handleScroll}
+        >
           {filteredPokemon.length === 0 ? (
             <p className="text-center text-slate-400 py-8">
               검색 결과가 없습니다.
             </p>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {filteredPokemon.map((pokemon) => (
+              {visiblePokemon.map((pokemon) => (
                 <PokemonCard
                   key={pokemon.id}
                   pokemon={pokemon}
@@ -129,12 +172,17 @@ export default function PokemonSearchModal({
               ))}
             </div>
           )}
+          {hasMore && (
+            <div className="text-center py-4">
+              <span className="text-sm text-slate-400">스크롤하여 더 보기...</span>
+            </div>
+          )}
         </div>
 
         {/* 하단 정보 */}
         <div className="px-6 py-3 border-t border-slate-100 text-center">
           <span className="text-slate-400 text-sm">
-            {filteredPokemon.length}마리 표시 중
+            {visiblePokemon.length}/{filteredPokemon.length}마리 표시 중
           </span>
         </div>
       </div>
