@@ -4,6 +4,8 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
+import { requireAuth } from "@/lib/auth-guard";
+import { getApiErrorMessage } from "@/lib/api-error";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -12,20 +14,10 @@ interface RouteParams {
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
+    const auth = await requireAuth();
+    if (auth.error) return auth.error;
+    const { user } = auth;
     const supabase = await createServerSupabase();
-
-    // 세션 이중 체크
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      return NextResponse.json(
-        { error: "로그인이 필요합니다." },
-        { status: 401 },
-      );
-    }
 
     const body = await request.json();
     const { name } = body as { name: unknown };
@@ -84,30 +76,18 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json(updated);
   } catch (error) {
     console.error("파티 수정 API 오류:", error);
-    return NextResponse.json(
-      { error: "서버 오류가 발생했습니다." },
-      { status: 500 },
-    );
+    const message = getApiErrorMessage(error, "파티 수정 중 오류가 발생했습니다.");
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
 export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
+    const auth = await requireAuth();
+    if (auth.error) return auth.error;
+    const { user } = auth;
     const supabase = await createServerSupabase();
-
-    // 세션 이중 체크
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      return NextResponse.json(
-        { error: "로그인이 필요합니다." },
-        { status: 401 },
-      );
-    }
 
     // 소유자 확인
     const { data: existing, error: fetchError } = await supabase
@@ -147,9 +127,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     return new NextResponse(null, { status: 204 });
   } catch (error) {
     console.error("파티 삭제 API 오류:", error);
-    return NextResponse.json(
-      { error: "서버 오류가 발생했습니다." },
-      { status: 500 },
-    );
+    const message = getApiErrorMessage(error, "파티 삭제 중 오류가 발생했습니다.");
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

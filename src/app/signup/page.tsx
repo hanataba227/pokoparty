@@ -7,6 +7,7 @@ import { createBrowserSupabase } from '@/lib/supabase-browser';
 import { getAuthErrorMessage } from '@/lib/auth-error';
 import AuthForm from '@/components/AuthForm';
 import OAuthButton from '@/components/OAuthButton';
+import { UI } from '@/lib/ui-tokens';
 
 export default function SignupPage() {
   return (
@@ -89,7 +90,7 @@ function SignupContent() {
         </div>
 
         {success ? (
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm text-center space-y-4">
+          <div className={`${UI.pageBg} p-6 rounded-xl border ${UI.rowBorder} shadow-sm text-center space-y-4`}>
             <div className="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center">
               <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -109,7 +110,7 @@ function SignupContent() {
             </button>
           </div>
         ) : (
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <div className={`${UI.pageBg} p-6 rounded-xl border ${UI.rowBorder} shadow-sm`}>
             <AuthForm
               mode="signup"
               onSubmit={handleSubmit}

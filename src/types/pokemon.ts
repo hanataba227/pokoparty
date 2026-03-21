@@ -49,13 +49,12 @@ export type StoryPointType = "gym" | "rival" | "elite4" | "champion";
 
 /** 포켓몬 역할 */
 export type PokemonRole =
-  | "물리어태커"
-  | "특수어태커"
-  | "물리탱커"
-  | "특수탱커"
-  | "스피드"
-  | "올라운더"
-  | "서포터";
+  | "물리형"
+  | "특공형"
+  | "쌍두형"
+  | "물리방어"
+  | "특수방어"
+  | "미분류";
 
 // ========================================
 // 종족값 (Base Stats)
@@ -100,6 +99,8 @@ export interface Pokemon {
   role: PokemonRole;
   /** 진화 정보 (없을 수 있음) */
   evolutions?: Evolution[];
+  /** 특성 목록 */
+  abilities?: { name: string; name_ko: string; is_hidden: boolean }[];
 }
 
 // ========================================
@@ -225,6 +226,12 @@ export interface RecommendFilters {
   excludeItemEvolution?: boolean;
   /** 스타팅 포켓몬 포함 */
   includeStarters?: boolean;
+  /** 최종 진화 포켓몬만 포함 */
+  finalOnly?: boolean;
+  /** 8세대 포켓몬만 포함 */
+  gen8Only?: boolean;
+  /** 선택된 타입만 포함 */
+  selectedTypes?: PokemonType[];
   /** 게임 버전 */
   gameVersion?: 'sword' | 'shield';
 }
@@ -257,26 +264,24 @@ export interface AnalysisResult {
   resistances: PokemonType[];
   /** 커버리지 점수 (0~100) */
   coverageScore: number;
-  /** 밸런스 점수 (0~100) */
-  balanceScore: number;
   /** 약점/내성 상세 (각 타입에 대한 배율) */
   typeMatchups: Record<PokemonType, number>;
 }
 
-/** 스코어링 세부 점수 */
+/** 스코어링 세부 점수 (optimized-weights.json 칼럼과 1:1 매핑) */
 export interface ScoringBreakdown {
-  /** 타입 커버리지 / 전투적합도 점수 */
-  typeCoverage: number;
-  /** 등장 시점 / 입수시기 점수 */
-  availability: number;
-  /** 레벨업 속도 / 자속화력 점수 */
-  levelUpSpeed: number;
-  /** 기술 습득 / 기술폭 점수 */
-  movePool: number;
-  /** 진화 용이성 점수 */
+  /** 전투적합도: 스탯 집중도 + 스피드 보너스 + 기술일치 + 카운터 견제 */
+  combatFitness: number;
+  /** 기술폭: 위력 가중 타입 커버리지 (power≥50) */
+  moveCoverage: number;
+  /** 입수시기: 비선형 곡선 (ratio^2.0) */
+  acquisition: number;
+  /** 자속화력: 최강 자속기 + 타이밍 + 초반 다양성 */
+  stabPower: number;
+  /** 진화 용이성 */
   evolutionEase: number;
-  /** 특성 보정 점수 (optional, 기존 코드 호환성) */
-  abilityBonus?: number;
+  /** 특성 보정: ability-scores.json 기반 */
+  abilityBonus: number;
 }
 
 /** 공격형 분류 */

@@ -4,6 +4,8 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
+import { requireAuth } from "@/lib/auth-guard";
+import { getApiErrorMessage } from "@/lib/api-error";
 
 /** 유저당 최대 저장 파티 수 */
 const MAX_PARTIES = 30;
@@ -13,20 +15,10 @@ const VALID_GAME_IDS = ["sword-shield"];
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await requireAuth();
+    if (auth.error) return auth.error;
+    const { user } = auth;
     const supabase = await createServerSupabase();
-
-    // 세션 이중 체크 (미들웨어가 이미 보호하지만)
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      return NextResponse.json(
-        { error: "로그인이 필요합니다." },
-        { status: 401 },
-      );
-    }
 
     // 페이지네이션 파라미터
     const { searchParams } = request.nextUrl;
@@ -67,29 +59,17 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("파티 목록 API 오류:", error);
-    return NextResponse.json(
-      { error: "서버 오류가 발생했습니다." },
-      { status: 500 },
-    );
+    const message = getApiErrorMessage(error, "파티 목록을 불러오는 중 오류가 발생했습니다.");
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireAuth();
+    if (auth.error) return auth.error;
+    const { user } = auth;
     const supabase = await createServerSupabase();
-
-    // 세션 이중 체크
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      return NextResponse.json(
-        { error: "로그인이 필요합니다." },
-        { status: 401 },
-      );
-    }
 
     const body = await request.json();
     const { name, pokemon_ids, story_point_id, game_id } = body as {
@@ -201,9 +181,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(party, { status: 201 });
   } catch (error) {
     console.error("파티 저장 API 오류:", error);
-    return NextResponse.json(
-      { error: "서버 오류가 발생했습니다." },
-      { status: 500 },
-    );
+    const message = getApiErrorMessage(error, "파티 저장 중 오류가 발생했습니다.");
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

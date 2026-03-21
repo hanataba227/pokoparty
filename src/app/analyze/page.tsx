@@ -17,6 +17,7 @@ import PartySlot from '@/components/PartySlot';
 import PokemonSearchModal from '@/components/PokemonSearchModal';
 import TypeBadge from '@/components/TypeBadge';
 import { Loader2, BarChart3, Shield, Swords, AlertTriangle } from 'lucide-react';
+import { UI } from '@/lib/ui-tokens';
 
 /** 종합 점수 등급 색상 */
 function getScoreColor(score: number): string {
@@ -36,7 +37,7 @@ function getScoreLabel(score: number): string {
 export default function AnalyzePage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className={`min-h-screen ${UI.pageBg} flex items-center justify-center`}>
         <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
       </div>
     }>
@@ -186,11 +187,11 @@ function AnalyzeContent() {
 
   // 종합 점수
   const totalScore = analysis
-    ? Math.round((analysis.coverageScore + analysis.balanceScore) / 2)
+    ? analysis.coverageScore
     : 0;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className={`min-h-screen ${UI.pageBg}`}>
       <div className="max-w-5xl mx-auto px-4 py-8 sm:py-12">
         {/* 페이지 헤더 */}
         <div className="text-center mb-8">
@@ -203,7 +204,7 @@ function AnalyzeContent() {
         </div>
 
         {/* 파티 선택 영역 */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
+        <div className={`${UI.pageBg} rounded-2xl shadow-sm border ${UI.rowBorder} p-6 mb-8`}>
           <h2 className="text-lg font-semibold text-slate-900 mb-4">
             파티 구성
           </h2>
@@ -271,7 +272,7 @@ function AnalyzeContent() {
         {analysis && (
           <div className="space-y-6">
             {/* 종합 점수 */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className={`${UI.pageBg} rounded-2xl shadow-sm border ${UI.rowBorder} p-6`}>
               <h2 className="text-lg font-semibold text-slate-900 mb-4">
                 종합 점수
               </h2>
@@ -295,20 +296,12 @@ function AnalyzeContent() {
                       커버리지
                     </div>
                   </div>
-                  <div className="text-center">
-                    <div className={`text-3xl font-bold ${getScoreColor(analysis.balanceScore)}`}>
-                      {analysis.balanceScore}
-                    </div>
-                    <div className="text-xs text-slate-500 mt-1">
-                      밸런스
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
 
             {/* 타입 커버리지 레이더 차트 */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className={`${UI.pageBg} rounded-2xl shadow-sm border ${UI.rowBorder} p-6`}>
               <h2 className="text-lg font-semibold text-slate-900 mb-4">
                 타입 방어 매치업
               </h2>
@@ -360,7 +353,7 @@ function AnalyzeContent() {
             {/* 약점 / 내성 목록 */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {/* 약점 */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+              <div className={`${UI.pageBg} rounded-2xl shadow-sm border ${UI.rowBorder} p-6`}>
                 <div className="flex items-center gap-2 mb-4">
                   <Shield className="w-5 h-5 text-red-500" />
                   <h2 className="text-lg font-semibold text-slate-900">
@@ -391,7 +384,7 @@ function AnalyzeContent() {
               </div>
 
               {/* 내성 */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+              <div className={`${UI.pageBg} rounded-2xl shadow-sm border ${UI.rowBorder} p-6`}>
                 <div className="flex items-center gap-2 mb-4">
                   <Shield className="w-5 h-5 text-blue-500" />
                   <h2 className="text-lg font-semibold text-slate-900">
@@ -423,7 +416,7 @@ function AnalyzeContent() {
             </div>
 
             {/* 공격 커버리지 */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className={`${UI.pageBg} rounded-2xl shadow-sm border ${UI.rowBorder} p-6`}>
               <div className="flex items-center gap-2 mb-4">
                 <Swords className="w-5 h-5 text-indigo-500" />
                 <h2 className="text-lg font-semibold text-slate-900">

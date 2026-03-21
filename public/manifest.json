@@ -1,0 +1,17 @@
+{
+  "name": "PokoParty - 포코파티",
+  "short_name": "PokoParty",
+  "description": "포켓몬 스토리 공략에 최적화된 파티를 추천받으세요.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1e293b",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "/favicon-p.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

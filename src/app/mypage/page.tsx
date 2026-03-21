@@ -7,12 +7,32 @@ import ProfileSection from '@/components/ProfileSection';
 import SavedPartyList from '@/components/SavedPartyList';
 import EmptyState from '@/components/EmptyState';
 import type { SavedParty } from '@/types/pokemon';
+import { UI } from '@/lib/ui-tokens';
 
 interface PartiesResponse {
   parties: SavedParty[];
   total: number;
   page: number;
   limit: number;
+}
+
+function SkeletonCards() {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className={`${UI.pageBg} ${UI.border} p-4 shadow-sm animate-pulse`}>
+          <div className="h-5 bg-slate-200 rounded w-2/3 mb-3" />
+          <div className="grid grid-cols-3 gap-1 mb-3">
+            {[1, 2, 3, 4, 5, 6].map((j) => (
+              <div key={j} className="aspect-square bg-slate-200 rounded-lg" />
+            ))}
+          </div>
+          <div className="h-3 bg-slate-200 rounded w-1/2 mb-2" />
+          <div className="h-8 bg-slate-200 rounded mt-3" />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default function MyPage() {
@@ -76,7 +96,7 @@ export default function MyPage() {
   if (authLoading) {
     return (
       <div className="py-8 space-y-6">
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm animate-pulse">
+        <div className={`${UI.pageBg} ${UI.border} p-6 shadow-sm animate-pulse`}>
           <div className="flex items-start gap-4">
             <div className="w-16 h-16 bg-slate-200 rounded-full" />
             <div className="flex-1 space-y-2">
@@ -86,20 +106,7 @@ export default function MyPage() {
             </div>
           </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm animate-pulse">
-              <div className="h-5 bg-slate-200 rounded w-2/3 mb-3" />
-              <div className="grid grid-cols-3 gap-1 mb-3">
-                {[1, 2, 3, 4, 5, 6].map((j) => (
-                  <div key={j} className="aspect-square bg-slate-200 rounded-lg" />
-                ))}
-              </div>
-              <div className="h-3 bg-slate-200 rounded w-1/2 mb-2" />
-              <div className="h-8 bg-slate-200 rounded mt-3" />
-            </div>
-          ))}
-        </div>
+        <SkeletonCards />
       </div>
     );
   }
@@ -117,20 +124,7 @@ export default function MyPage() {
       )}
 
       {loadingParties ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm animate-pulse">
-              <div className="h-5 bg-slate-200 rounded w-2/3 mb-3" />
-              <div className="grid grid-cols-3 gap-1 mb-3">
-                {[1, 2, 3, 4, 5, 6].map((j) => (
-                  <div key={j} className="aspect-square bg-slate-200 rounded-lg" />
-                ))}
-              </div>
-              <div className="h-3 bg-slate-200 rounded w-1/2 mb-2" />
-              <div className="h-8 bg-slate-200 rounded mt-3" />
-            </div>
-          ))}
-        </div>
+        <SkeletonCards />
       ) : parties.length === 0 && currentPage === 1 ? (
         <EmptyState />
       ) : (

@@ -2,16 +2,18 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import StepIndicator from '@/components/StepIndicator';
-import StoryPointSelector from '@/components/StoryPointSelector';
 import PartySlot from '@/components/PartySlot';
 import PokemonSearchModal from '@/components/PokemonSearchModal';
 import PokemonCard from '@/components/PokemonCard';
-import type { StoryPoint, Pokemon, ScoringBreakdown } from '@/types/pokemon';
-import { Loader2, ChevronLeft, ChevronRight, ChevronDown, SkipForward, Save, LogIn, SlidersHorizontal } from 'lucide-react';
+import type { Pokemon, ScoringBreakdown, PokemonType } from '@/types/pokemon';
+import { Loader2, ChevronLeft, ChevronRight, ChevronDown, SkipForward, Save, LogIn, SlidersHorizontal, Filter } from 'lucide-react';
+import { TYPE_COLORS } from '@/components/TypeBadge';
+import { UI } from '@/lib/ui-tokens';
+import { ALL_TYPES } from '@/lib/type-calc';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 
-const STEPS = ['게임 선택', '스토리 포인트', '고정 포켓몬', '추천 결과'];
+const STEPS = ['게임 선택', '고정 포켓몬', '추천 결과'];
 
 const GAME_TITLES = [
   { id: 'gen8-swsh-sword', label: '소드', gameId: 'gen8-swsh', icon: '🗡️' },
@@ -35,13 +37,7 @@ export default function RecommendPage() {
   // Step 1: 게임 선택
   const [selectedGameId, setSelectedGameId] = useState<string>();
 
-  // Step 2: 스토리 포인트
-  const [storyPoints, setStoryPoints] = useState<StoryPoint[]>([]);
-  const [selectedStoryPointId, setSelectedStoryPointId] = useState<string>();
-  const [storyPointsLoading, setStoryPointsLoading] = useState(false);
-  const [storyPointsError, setStoryPointsError] = useState<string>();
-
-  // Step 3: 고정 포켓몬
+  // Step 2: 고정 포켓몬
   const [allPokemon, setAllPokemon] = useState<Pokemon[]>([]);
   const [fixedPokemon, setFixedPokemon] = useState<(Pokemon | undefined)[]>(
     Array(6).fill(undefined)
@@ -51,16 +47,20 @@ export default function RecommendPage() {
   const [pokemonLoading, setPokemonLoading] = useState(false);
   const [pokemonError, setPokemonError] = useState<string>();
 
-  // Step 4: 추천 결과
+  // Step 3: 추천 결과
   const [recommendations, setRecommendations] = useState<RecommendationItem[]>([]);
   const [recommendLoading, setRecommendLoading] = useState(false);
   const [recommendError, setRecommendError] = useState<string>();
 
   // 필터 옵션
-  const [filterOpen, setFilterOpen] = useState(false);
+  const [basicOpen, setBasicOpen] = useState(false);
+  const [typeOpen, setTypeOpen] = useState(false);
   const [excludeTradeEvolution, setExcludeTradeEvolution] = useState(true); // 기본: 통신교환 제외
-  const [excludeItemEvolution, setExcludeItemEvolution] = useState(false); // 기본: 도구진화 포함
-  const [includeStarters, setIncludeStarters] = useState(true); // 기본: 스타터 포함
+  const [excludeItemEvolution, setExcludeItemEvolution] = useState(true); // 기본: 도구진화 제외
+  const [includeStarters, setIncludeStarters] = useState(false); // 기본: 스타터 미포함
+  const [finalOnly, setFinalOnly] = useState(true); // 기본: 최종 진화만 추천
+  const [gen8Only, setGen8Only] = useState(false); // 기본: 전체 세대
+  const [selectedTypes, setSelectedTypes] = useState<Set<PokemonType>>(() => new Set(ALL_TYPES));
 
   // 파티 저장
   const { user } = useAuth();
@@ -68,42 +68,14 @@ export default function RecommendPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string>();
 
-  // Step 2: 스토리 포인트 로드 (게임 선택 후)
-  useEffect(() => {
-    if (currentStep < 2 || !selectedGameId) return;
-    if (storyPoints.length > 0) return;
-
-    async function fetchStoryPoints() {
-      try {
-        setStoryPointsLoading(true);
-        setStoryPointsError(undefined);
-        const gameEntry = GAME_TITLES.find(g => g.id === selectedGameId);
-        const res = await fetch(`/api/story-points?gameId=${gameEntry?.gameId || ''}`);
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || '스토리 포인트를 불러오지 못했습니다.');
-        }
-        const data = await res.json();
-        setStoryPoints(data.storyPoints);
-      } catch (err) {
-        setStoryPointsError(
-          err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.'
-        );
-      } finally {
-        setStoryPointsLoading(false);
-      }
-    }
-    fetchStoryPoints();
-  }, [currentStep, selectedGameId, storyPoints.length]);
-
   // 게임 버전 결정 (소드/실드)
   const gameVersion = selectedGameId === 'gen8-swsh-sword' ? 'sword'
     : selectedGameId === 'gen8-swsh-shield' ? 'shield'
     : undefined;
 
-  // Step 3: 포켓몬 목록 로드 (Step 3 진입 시, 게임 버전별)
+  // Step 2: 포켓몬 목록 로드 (Step 2 진입 시, 게임 버전별)
   useEffect(() => {
-    if (currentStep < 3 || !selectedGameId) return;
+    if (currentStep < 2 || !selectedGameId) return;
 
     async function fetchPokemon() {
       try {
@@ -134,10 +106,8 @@ export default function RecommendPage() {
     [fixedPokemon]
   );
 
-  // Step 4: 추천 요청
+  // Step 3: 추천 요청 (자유 추천 — storyPointId 없음)
   const fetchRecommendations = useCallback(async () => {
-    if (!selectedStoryPointId) return;
-
     try {
       setRecommendLoading(true);
       setRecommendError(undefined);
@@ -148,13 +118,15 @@ export default function RecommendPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          storyPointId: selectedStoryPointId,
           fixedPokemon: fixedPokemonIds,
           slotsToFill,
           filters: {
             excludeTradeEvolution,
             excludeItemEvolution,
             includeStarters,
+            finalOnly,
+            gen8Only,
+            selectedTypes: Array.from(selectedTypes),
             gameVersion,
           },
         }),
@@ -174,11 +146,11 @@ export default function RecommendPage() {
     } finally {
       setRecommendLoading(false);
     }
-  }, [selectedStoryPointId, gameVersion, fixedPokemonIds, excludeTradeEvolution, excludeItemEvolution, includeStarters]);
+  }, [gameVersion, fixedPokemonIds, excludeTradeEvolution, excludeItemEvolution, includeStarters, finalOnly, gen8Only, selectedTypes]);
 
   // Step 진행 시 추천 요청
   useEffect(() => {
-    if (currentStep === 4) {
+    if (currentStep === 3) {
       fetchRecommendations();
     }
   }, [currentStep, fetchRecommendations]);
@@ -206,13 +178,12 @@ export default function RecommendPage() {
 
   const canGoNext = () => {
     if (currentStep === 1) return !!selectedGameId;
-    if (currentStep === 2) return !!selectedStoryPointId;
-    if (currentStep === 3) return true; // 고정 포켓몬은 선택사항
+    if (currentStep === 2) return true; // 고정 포켓몬은 선택사항
     return false;
   };
 
   const goNext = () => {
-    if (currentStep < 4) setCurrentStep((s) => s + 1);
+    if (currentStep < 3) setCurrentStep((s) => s + 1);
   };
 
   const goPrev = () => {
@@ -241,7 +212,7 @@ export default function RecommendPage() {
         body: JSON.stringify({
           name: `${gameEntry?.label || '파티'} 추천 파티`,
           pokemon_ids: allPokemonIds,
-          story_point_id: selectedStoryPointId ?? null,
+          story_point_id: null,
           game_id: gameId,
         }),
       });
@@ -267,7 +238,7 @@ export default function RecommendPage() {
         파티 추천
       </h1>
       <p className="text-center text-slate-500 mb-8">
-        체육관에 맞는 최적의 파티를 추천받으세요.
+        최적의 파티를 추천받으세요.
       </p>
 
       <StepIndicator steps={STEPS} currentStep={currentStep} onStepClick={setCurrentStep} />
@@ -291,10 +262,10 @@ export default function RecommendPage() {
                   disabled={!!game.disabled}
                   className={`relative flex flex-col items-center gap-3 p-6 rounded-xl border-2 transition-all duration-200
                     ${game.disabled
-                      ? 'border-slate-200 bg-slate-50 opacity-50 cursor-not-allowed'
+                      ? 'border-slate-300 bg-white opacity-50 cursor-not-allowed'
                       : selectedGameId === game.id
                         ? 'border-indigo-500 bg-indigo-50 shadow-md'
-                        : 'border-slate-200 bg-white hover:border-indigo-300 cursor-pointer'
+                        : 'border-slate-300 bg-white hover:border-indigo-300 cursor-pointer'
                     }`}
                 >
                   <span className="text-3xl">{game.icon}</span>
@@ -322,41 +293,8 @@ export default function RecommendPage() {
           </div>
         )}
 
-        {/* ===== Step 2: 스토리 포인트 선택 ===== */}
+        {/* ===== Step 2: 고정 포켓몬 선택 ===== */}
         {currentStep === 2 && (
-          <div>
-            <h2 className="text-xl font-bold text-slate-800 mb-4">
-              어디까지 진행하셨나요?
-            </h2>
-            <p className="text-slate-500 text-sm mb-6">
-              공략할 체육관을 선택해주세요. 해당 시점까지 잡을 수 있는 포켓몬을 기반으로 추천합니다.
-            </p>
-
-            {storyPointsLoading && (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
-                <span className="ml-3 text-slate-500">스토리 포인트 로딩 중...</span>
-              </div>
-            )}
-
-            {storyPointsError && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700">
-                {storyPointsError}
-              </div>
-            )}
-
-            {!storyPointsLoading && !storyPointsError && (
-              <StoryPointSelector
-                storyPoints={storyPoints}
-                selectedId={selectedStoryPointId}
-                onSelect={setSelectedStoryPointId}
-              />
-            )}
-          </div>
-        )}
-
-        {/* ===== Step 3: 고정 포켓몬 선택 ===== */}
-        {currentStep === 3 && (
           <div>
             <h2 className="text-xl font-bold text-slate-800 mb-4">
               이미 키우고 있는 포켓몬이 있나요?
@@ -399,108 +337,116 @@ export default function RecommendPage() {
                   availablePokemon={allPokemon}
                 />
 
-                {/* 추천 옵션 (접이식 패널) */}
-                <div className="mt-8 max-w-2xl mx-auto">
-                  <button
-                    type="button"
-                    onClick={() => setFilterOpen((v) => !v)}
-                    className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors cursor-pointer"
-                  >
-                    <SlidersHorizontal className="w-4 h-4" />
-                    추천 옵션
-                    <ChevronDown
-                      className={`w-4 h-4 transition-transform duration-200 ${
-                        filterOpen ? 'rotate-180' : ''
-                      }`}
-                    />
-                  </button>
+                {/* 추천 옵션 (카테고리 분리형) */}
+                <div className="mt-8 max-w-2xl mx-auto space-y-3">
+                  {/* Panel 1: 기본 옵션 */}
+                  <div className={`${UI.border} overflow-hidden`}>
+                    <button
+                      type="button"
+                      onClick={() => setBasicOpen(!basicOpen)}
+                      className={`flex w-full items-center justify-between ${UI.pageBg} px-4 py-2.5 text-sm font-medium text-slate-700 ${UI.hoverBg} transition-colors ${basicOpen ? `border-b ${UI.rowBorder}` : ''}`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <SlidersHorizontal className="h-4 w-4 text-indigo-600" />
+                        기본 옵션
+                      </span>
+                      <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${basicOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {basicOpen && (
+                      <div className={`space-y-3 ${UI.pageBg} p-4`}>
+                        {([
+                          { on: !excludeTradeEvolution, onToggle: () => setExcludeTradeEvolution(v => !v), label: '통신 교환 진화 포함' },
+                          { on: !excludeItemEvolution, onToggle: () => setExcludeItemEvolution(v => !v), label: '조건(도구, 돌 등) 진화 포함' },
+                          { on: includeStarters, onToggle: () => setIncludeStarters(v => !v), label: '스타팅 포켓몬 포함' },
+                          { on: finalOnly, onToggle: () => setFinalOnly(v => !v), label: '최종 진화 포켓몬만 포함' },
+                          { on: gen8Only, onToggle: () => setGen8Only(v => !v), label: '8세대 포켓몬만 포함' },
+                        ] as const).map(({ on, onToggle, label }) => (
+                          <label key={label} className="flex items-center justify-between gap-3 cursor-pointer select-none">
+                            <span className="text-sm text-slate-700">{label}</span>
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={on}
+                              onClick={onToggle}
+                              className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 cursor-pointer ${on ? 'bg-indigo-600' : 'bg-slate-300'}`}
+                            >
+                              <span className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${on ? 'translate-x-5' : 'translate-x-0'}`} />
+                            </button>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
 
-                  {filterOpen && (
-                    <div className="mt-3 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-4">
-                      {/* 통신 교환 진화 포함 */}
-                      <label className="flex items-center justify-between cursor-pointer">
-                        <div>
-                          <span className="text-sm font-medium text-slate-700">통신 교환 진화 포함</span>
-                          <p className="text-xs text-slate-400 mt-0.5">
-                            통신 교환이 필요한 진화 포켓몬을 추천에 포함합니다
-                          </p>
+                  {/* Panel 2: 타입 필터 */}
+                  <div className={`${UI.border} overflow-hidden`}>
+                    <button
+                      type="button"
+                      onClick={() => setTypeOpen(!typeOpen)}
+                      className={`flex w-full items-center justify-between ${UI.pageBg} px-4 py-2.5 text-sm font-medium text-slate-700 ${UI.hoverBg} transition-colors ${typeOpen ? `border-b ${UI.rowBorder}` : ''}`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <Filter className="h-4 w-4 text-indigo-600" />
+                        타입 필터
+                      </span>
+                      <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${typeOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {typeOpen && (
+                      <div className={`${UI.pageBg} p-4`}>
+                        <p className="text-xs text-slate-400 mb-3">선택된 타입의 포켓몬만 포함</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {ALL_TYPES.map((t) => {
+                            const active = selectedTypes.has(t);
+                            const color = TYPE_COLORS[t];
+                            return (
+                              <button
+                                key={t}
+                                type="button"
+                                onClick={() => setSelectedTypes(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(t)) next.delete(t); else next.add(t);
+                                  return next;
+                                })}
+                                className="rounded-full px-2.5 py-1 text-xs font-semibold transition-all duration-150"
+                                style={{
+                                  backgroundColor: active ? color : `${color}20`,
+                                  color: active ? '#fff' : color,
+                                  border: `1.5px solid ${color}`,
+                                }}
+                              >
+                                {t}
+                              </button>
+                            );
+                          })}
                         </div>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={!excludeTradeEvolution}
-                          onClick={() => setExcludeTradeEvolution((v) => !v)}
-                          className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 cursor-pointer ${
-                            !excludeTradeEvolution ? 'bg-indigo-600' : 'bg-slate-300'
-                          }`}
-                        >
-                          <span
-                            className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                              !excludeTradeEvolution ? 'translate-x-5' : 'translate-x-0'
-                            }`}
-                          />
-                        </button>
-                      </label>
-
-                      {/* 도구/돌 진화 포함 */}
-                      <label className="flex items-center justify-between cursor-pointer">
-                        <div>
-                          <span className="text-sm font-medium text-slate-700">도구/돌 진화 포함</span>
-                          <p className="text-xs text-slate-400 mt-0.5">
-                            진화석이나 아이템이 필요한 진화 포켓몬을 추천에 포함합니다
-                          </p>
+                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+                          <span className="text-xs text-slate-500">
+                            {selectedTypes.size === 0
+                              ? '선택 없음 (전체 타입 추천)'
+                              : <><span className="font-semibold text-indigo-600">{selectedTypes.size}</span> 타입 선택됨</>
+                            }
+                          </span>
+                          <div className="flex gap-2">
+                            <button type="button" onClick={() => setSelectedTypes(new Set(ALL_TYPES))} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors">
+                              전체 선택
+                            </button>
+                            <span className="text-slate-300">|</span>
+                            <button type="button" onClick={() => setSelectedTypes(new Set())} className="text-xs text-slate-400 hover:text-slate-600 font-medium transition-colors">
+                              초기화
+                            </button>
+                          </div>
                         </div>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={!excludeItemEvolution}
-                          onClick={() => setExcludeItemEvolution((v) => !v)}
-                          className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 cursor-pointer ${
-                            !excludeItemEvolution ? 'bg-indigo-600' : 'bg-slate-300'
-                          }`}
-                        >
-                          <span
-                            className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                              !excludeItemEvolution ? 'translate-x-5' : 'translate-x-0'
-                            }`}
-                          />
-                        </button>
-                      </label>
-
-                      {/* 스타팅 포켓몬 포함 */}
-                      <label className="flex items-center justify-between cursor-pointer">
-                        <div>
-                          <span className="text-sm font-medium text-slate-700">스타팅 포켓몬 포함</span>
-                          <p className="text-xs text-slate-400 mt-0.5">
-                            스타터 포켓몬(흥나숭/염버니/울머기 라인)을 추천에 포함합니다
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={includeStarters}
-                          onClick={() => setIncludeStarters((v) => !v)}
-                          className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 cursor-pointer ${
-                            includeStarters ? 'bg-indigo-600' : 'bg-slate-300'
-                          }`}
-                        >
-                          <span
-                            className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform duration-200 ${
-                              includeStarters ? 'translate-x-5' : 'translate-x-0'
-                            }`}
-                          />
-                        </button>
-                      </label>
-                    </div>
-                  )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </>
             )}
           </div>
         )}
 
-        {/* ===== Step 4: 추천 결과 ===== */}
-        {currentStep === 4 && (
+        {/* ===== Step 3: 추천 결과 ===== */}
+        {currentStep === 3 && (
           <div>
             <h2 className="text-xl font-bold text-slate-800 mb-4">
               추천 파티
@@ -523,7 +469,7 @@ export default function RecommendPage() {
 
             {!recommendLoading && !recommendError && recommendations.length === 0 && fixedPokemonList.length === 0 && (
               <div className="text-center py-16 text-slate-400">
-                추천 결과가 없습니다. 다른 스토리 포인트를 선택해보세요.
+                추천 결과가 없습니다. 필터 옵션을 조정해보세요.
               </div>
             )}
 
@@ -603,24 +549,24 @@ export default function RecommendPage() {
       </div>
 
       {/* 네비게이션 버튼 */}
-      <div className="flex items-center justify-between mt-12 pt-6 border-t border-slate-200">
+      <div className={`flex items-center justify-between mt-12 pt-6 border-t ${UI.rowBorder}`}>
         <button
           onClick={goPrev}
           disabled={currentStep === 1}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl
+          className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl
             text-slate-600 font-medium
-            border border-slate-300
+            ${UI.border}
             hover:border-slate-400 hover:text-slate-800
             disabled:opacity-40 disabled:cursor-not-allowed
             transition-colors duration-200 cursor-pointer
-            focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2`}
         >
           <ChevronLeft className="w-4 h-4" />
           이전
         </button>
 
         <div className="flex items-center gap-3">
-          {currentStep === 3 && (
+          {currentStep === 2 && (
             <button
               onClick={goNext}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl
@@ -634,7 +580,7 @@ export default function RecommendPage() {
             </button>
           )}
 
-          {currentStep < 4 && (
+          {currentStep < 3 && (
             <button
               onClick={goNext}
               disabled={!canGoNext()}

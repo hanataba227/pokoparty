@@ -6,6 +6,7 @@ import type { Pokemon, PokemonType } from '@/types/pokemon';
 import { ALL_TYPES } from '@/lib/type-calc';
 import PokemonCard from './PokemonCard';
 import { TYPE_COLORS } from './TypeBadge';
+import { UI } from '@/lib/ui-tokens';
 
 interface PokemonSearchModalProps {
   isOpen: boolean;
@@ -43,7 +44,7 @@ export default function PokemonSearchModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* 헤더 */}
-        <div className="flex items-center justify-between p-6 pb-4 border-b border-slate-200">
+        <div className={`flex items-center justify-between p-6 pb-4 border-b ${UI.rowBorder}`}>
           <h2 className="text-xl font-bold text-slate-900">
             포켓몬 선택
           </h2>
@@ -66,12 +67,12 @@ export default function PokemonSearchModal({
               placeholder="포켓몬 이름 검색..."
               value={searchName}
               onChange={(e) => setSearchName(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 rounded-lg
-                border border-slate-200 bg-white
+              className={`w-full pl-10 pr-4 py-3 rounded-lg
+                border ${UI.rowBorder} ${UI.pageBg}
                 text-slate-900
                 placeholder:text-slate-400
                 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none
-                transition-colors duration-200 text-base"
+                transition-colors duration-200 text-base`}
             />
           </div>
 

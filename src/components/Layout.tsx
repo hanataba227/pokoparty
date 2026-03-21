@@ -5,10 +5,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Menu, X, Github, User, LogOut, ChevronDown } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { UI } from '@/lib/ui-tokens';
 
 const navLinks = [
   { href: '/recommend', label: '파티 추천' },
   { href: '/analyze', label: '파티 분석' },
+  { href: '/pokedex', label: '포켓몬 도감' },
 ];
 
 function Navbar() {
@@ -36,7 +38,7 @@ function Navbar() {
   };
 
   return (
-    <nav className="sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-slate-200">
+    <nav className={`sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b ${UI.rowBorder}`}>
       <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
         <Link
           href="/"
@@ -77,7 +79,7 @@ function Navbar() {
               </button>
 
               {profileDropdownOpen && (
-                <div className="absolute right-0 mt-1 w-auto min-w-[120px] bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50">
+                <div className={`absolute right-0 mt-1 w-auto min-w-[120px] ${UI.pageBg} rounded-lg shadow-lg border ${UI.rowBorder} py-1 z-50`}>
                   <Link
                     href="/mypage"
                     onClick={() => setProfileDropdownOpen(false)}
@@ -128,7 +130,7 @@ function Navbar() {
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-slate-200 bg-white">
+        <div className={`md:hidden border-t ${UI.rowBorder} ${UI.pageBg}`}>
           <div className="px-4 py-3 space-y-2">
             {navLinks.map((link) => (
               <Link
@@ -141,7 +143,7 @@ function Navbar() {
               </Link>
             ))}
 
-            <div className="border-t border-slate-200 pt-2 mt-2">
+            <div className={`border-t ${UI.rowBorder} pt-2 mt-2`}>
               {loading ? (
                 <div className="h-8 bg-slate-100 rounded-lg animate-pulse" />
               ) : user ? (
@@ -173,7 +175,7 @@ function Navbar() {
                   <Link
                     href="/login"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="flex-1 py-2 text-center text-sm font-medium text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                    className={`flex-1 py-2 text-center text-sm font-medium text-slate-600 ${UI.border} ${UI.hoverBg} transition-colors`}
                   >
                     로그인
                   </Link>
@@ -196,7 +198,7 @@ function Navbar() {
 
 function Footer() {
   return (
-    <footer className="bg-slate-50 border-t border-slate-200">
+    <footer className={`${UI.pageBg} border-t ${UI.rowBorder}`}>
       <div className="max-w-6xl mx-auto px-4 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
         <p className="text-slate-400 text-sm">
           &copy; {new Date().getFullYear()} PokoParty. All rights reserved.

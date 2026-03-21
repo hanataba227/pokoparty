@@ -5,6 +5,7 @@ import type { Pokemon, ScoringBreakdown } from '@/types/pokemon';
 import { getFinalScore } from '@/lib/score-utils';
 import { getSpriteUrl } from '@/lib/sprite';
 import TypeBadge from './TypeBadge';
+import { UI } from '@/lib/ui-tokens';
 
 interface PokemonCardProps {
   pokemon: Pokemon;
@@ -25,7 +26,7 @@ export default function PokemonCard({ pokemon, score, isFixed, compact, onClick 
         hover:shadow-sm transition-all duration-200
         ${isFixed
           ? 'border-amber-400 ring-1 ring-amber-200'
-          : 'border-slate-200 hover:border-indigo-300'
+          : `${UI.rowBorder} hover:border-indigo-300`
         }
         ${onClick ? 'cursor-pointer' : ''}`}
     >
@@ -65,13 +66,6 @@ export default function PokemonCard({ pokemon, score, isFixed, compact, onClick 
         ))}
       </div>
 
-      {/* 역할 */}
-      {!compact && (
-        <p className="text-center text-indigo-600 text-xs font-medium mt-2">
-          {pokemon.role}
-        </p>
-      )}
-
       {/* 추천 점수 (compact에서는 총점만) */}
       {score && totalScore !== null && (
         compact ? (
@@ -87,23 +81,23 @@ export default function PokemonCard({ pokemon, score, isFixed, compact, onClick 
             </div>
             <div className="space-y-1 text-[11px] text-slate-500">
               <div className="flex justify-between">
-                <span>타입 커버리지</span>
-                <span className="font-medium">{score.typeCoverage}</span>
+                <span>전투적합도</span>
+                <span className="font-medium">{score.combatFitness}</span>
               </div>
               <div className="flex justify-between">
-                <span>등장 시점</span>
-                <span className="font-medium">{score.availability}</span>
+                <span>입수시기</span>
+                <span className="font-medium">{score.acquisition}</span>
               </div>
               <div className="flex justify-between">
-                <span>레벨업 속도</span>
-                <span className="font-medium">{score.levelUpSpeed}</span>
+                <span>자속화력</span>
+                <span className="font-medium">{score.stabPower}</span>
               </div>
               <div className="flex justify-between">
-                <span>기술 습득</span>
-                <span className="font-medium">{score.movePool}</span>
+                <span>기술폭</span>
+                <span className="font-medium">{score.moveCoverage}</span>
               </div>
               <div className="flex justify-between">
-                <span>진화 용이성</span>
+                <span>진화용이성</span>
                 <span className="font-medium">{score.evolutionEase}</span>
               </div>
             </div>

@@ -140,6 +140,7 @@ interface RawPokemon {
     learn_level: number;
   }[];
   sprite_url?: string;
+  abilities?: { name: string; name_ko: string; is_hidden: boolean }[];
 }
 
 interface RawPokemonFile {
@@ -170,22 +171,28 @@ export function loadPokemonData(gameVersion?: GameVersion): Pokemon[] {
     const stats: BaseStats = p.stats;
     const expGroup = p.exp_group as ExpGroup;
 
+    const canEvolve = p.evolutions && p.evolutions.length > 0;
+
     const pokemon: Pokemon = {
       id: p.id,
       name: p.name_ko || p.name,
       types,
       stats,
       expGroup,
-      role: classifyRoleFromStats(stats),
+      role: classifyRoleFromStats(stats, !!canEvolve),
     };
 
-    if (p.evolutions && p.evolutions.length > 0) {
+    if (canEvolve && p.evolutions) {
       pokemon.evolutions = p.evolutions.map((e) => ({
         method: e.method,
         level: e.level ?? undefined,
         item: e.item ?? undefined,
         to: e.to_id,
       }));
+    }
+
+    if (p.abilities && p.abilities.length > 0) {
+      pokemon.abilities = p.abilities;
     }
 
     return pokemon;
@@ -309,7 +316,6 @@ export function loadStoryData(): StoryPoint[] {
   // 스토리 포인트에 체육관 정보 매핑
   // 체육관이 있는 section에 대해 gym/rival/elite4/champion 구분
   const storyPoints: StoryPoint[] = [];
-  let gymIndex = 0;
   const gymSections = new Set<string>();
 
   for (const sp of storyRaw.story_points) {
@@ -338,7 +344,6 @@ export function loadStoryData(): StoryPoint[] {
             name: `${sp.location_name} 체육관 (${gym.leader})`,
           });
           gymSections.add(sp.section);
-          gymIndex++;
           continue;
         }
       }
@@ -398,6 +403,73 @@ interface RawEncounterFile {
 }
 
 /**
+ * encounter location_id → story-order location_id 매핑 테이블
+ * encounter JSON과 story-order JSON의 location_id 형식이 다른 것을 보정
+ */
+const ENCOUNTER_TO_STORY_LOCATION: Record<string, string> = {
+  // 이미 일치하는 town/city
+  postwick: "postwick",
+  wedgehurst: "wedgehurst",
+  turffield: "turffield",
+  hulbury: "hulbury",
+  motostoke: "motostoke",
+  hammerlocke: "hammerlocke",
+  "stow-on-side": "stow-on-side",
+  ballonlea: "ballonlea",
+  circhester: "circhester",
+  spikemuth: "spikemuth",
+  wyndon: "wyndon",
+  // route (routeN → galar-route-N)
+  route1: "galar-route-1",
+  route2: "galar-route-2",
+  route3: "galar-route-3",
+  route4: "galar-route-4",
+  route5: "galar-route-5",
+  route6: "galar-route-6",
+  route7: "galar-route-7",
+  route8: "galar-route-8",
+  route9: "galar-route-9",
+  route10: "galar-route-10",
+  // dungeon
+  slumberingweald: "slumbering-weald",
+  galarmine: "galar-mine",
+  "galarmineno.2": "galar-mine-2",
+  glimwoodtangle: "glimwood-tangle",
+  // Wild Area 남부
+  rollingfields: "wild-area-south",
+  dappledgrove: "wild-area-south",
+  westlakeaxewell: "wild-area-south",
+  eastlakeaxewell: "wild-area-south",
+  "axew'seye": "wild-area-south",
+  watchtowerruins: "wild-area-south",
+  "giant'sseat": "wild-area-south",
+  northlakemiloch: "wild-area-south",
+  southlakemiloch: "wild-area-south",
+  motostokeriverbank: "wild-area-south",
+  bridgefield: "wild-area-south",
+  // Wild Area 북부
+  stonywilderness: "wild-area-north",
+  dustybowl: "wild-area-north",
+  "giant'smirror": "wild-area-north",
+  "giant'scap": "wild-area-north",
+  hammerlockehills: "wild-area-north",
+  lakeofoutrage: "wild-area-north",
+};
+
+/**
+ * encounter name_en 정규화
+ * "Mr. Mime" → "mr-mime", "Mime Jr." → "mime-jr", "Farfetch'd" → "farfetchd"
+ */
+function normalizeEncounterName(nameEn: string): string {
+  return nameEn
+    .toLowerCase()
+    .replace(/[''.]/g, "") // 아포스트로피, 점 제거
+    .replace(/\s+/g, "-") // 공백 → 하이픈
+    .replace(/-+/g, "-") // 연속 하이픈 정리
+    .replace(/-$/, ""); // 끝 하이픈 제거
+}
+
+/**
  * 출현 정보 로드
  * encounters JSON에서 로드하여 Encounter[] 형태로 변환
  * 주의: 출현 데이터의 name_en으로는 pokemonId를 직접 매핑할 수 없으므로,
@@ -408,24 +480,22 @@ export function loadEncounters(): Encounter[] {
 
   const raw = readJsonFile<RawEncounterFile>("encounter", "gen8-swsh-encounters.json");
   loadPokemonData(); // 캐시 보장
-  const storyData = readJsonFile<RawStoryFile>("story", "gen8-swsh-story-order.json");
 
   // loadPokemonData에서 구축된 name_en -> id 캐시 재사용 (중복 파싱 방지)
   const nameToId = pokemonNameEnToIdCache ?? new Map<string, number>();
 
-  // location_id -> story order 매핑
-  const locationToStoryPointId = new Map<string, string>();
-  for (const sp of storyData.story_points) {
-    locationToStoryPointId.set(sp.location_id, sp.location_id);
-  }
-
   const encounters: Encounter[] = [];
 
   for (const loc of raw.locations) {
-    const storyPointId = locationToStoryPointId.get(loc.location_id) || loc.location_id;
+    // BUG-1/BUG-3 수정: 매핑 테이블로 encounter location_id → story location_id 변환
+    const storyPointId =
+      ENCOUNTER_TO_STORY_LOCATION[loc.location_id] || loc.location_id;
 
     for (const enc of loc.encounters) {
-      const pokemonId = nameToId.get(enc.name_en.toLowerCase());
+      // BUG-4 수정: name_en 정규화 (Mr. Mime → mr-mime 등)
+      const normalizedName = normalizeEncounterName(enc.name_en);
+      const pokemonId =
+        nameToId.get(normalizedName) || nameToId.get(enc.name_en.toLowerCase());
       if (!pokemonId) continue; // 포켓몬 데이터에 없으면 스킵
 
       // method 변환

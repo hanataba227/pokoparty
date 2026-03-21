@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Pencil, Check, X } from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
 import { createBrowserSupabase } from '@/lib/supabase-browser';
+import { UI } from '@/lib/ui-tokens';
 
 interface ProfileSectionProps {
   user: User;
@@ -56,7 +57,7 @@ export default function ProfileSection({ user }: ProfileSectionProps) {
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+    <div className={`${UI.pageBg} ${UI.border} p-6 shadow-sm`}>
       <div className="flex items-start gap-4">
         {/* Avatar */}
         <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">

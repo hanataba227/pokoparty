@@ -7,6 +7,7 @@ import { createBrowserSupabase } from '@/lib/supabase-browser';
 import { getAuthErrorMessage } from '@/lib/auth-error';
 import AuthForm from '@/components/AuthForm';
 import OAuthButton from '@/components/OAuthButton';
+import { UI } from '@/lib/ui-tokens';
 
 export default function LoginPage() {
   return (
@@ -79,7 +80,7 @@ function LoginContent() {
           <p className="mt-2 text-slate-600">로그인하여 파티를 관리하세요</p>
         </div>
 
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <div className={`${UI.pageBg} p-6 rounded-xl border ${UI.rowBorder} shadow-sm`}>
           <AuthForm
             mode="login"
             onSubmit={handleSubmit}

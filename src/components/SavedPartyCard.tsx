@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Trash2, BarChart3 } from 'lucide-react';
 import type { SavedParty } from '@/types/pokemon';
 import { getSpriteUrl } from '@/lib/sprite';
+import { UI } from '@/lib/ui-tokens';
 
 interface SavedPartyCardProps {
   party: SavedParty;
@@ -38,7 +39,7 @@ export default function SavedPartyCard({ party, onDelete }: SavedPartyCardProps)
   });
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+    <div className={`${UI.pageBg} ${UI.border} p-4 shadow-sm hover:shadow-md transition-shadow`}>
       <h3 className="font-semibold text-slate-800 mb-3 truncate">{party.name}</h3>
 
       {/* Pokemon Sprites 3x2 Grid */}
@@ -62,7 +63,7 @@ export default function SavedPartyCard({ party, onDelete }: SavedPartyCardProps)
             key={`empty-${idx}`}
             className="aspect-square bg-slate-50 rounded-lg flex items-center justify-center"
           >
-            <div className="w-6 h-6 border-2 border-dashed border-slate-300 rounded-full" />
+            <div className={`w-6 h-6 border-2 border-dashed ${UI.rowBorder} rounded-full`} />
           </div>
         ))}
       </div>
@@ -89,7 +90,7 @@ export default function SavedPartyCard({ party, onDelete }: SavedPartyCardProps)
           <button
             onClick={() => setShowConfirm(false)}
             disabled={deleting}
-            className="flex-1 py-1.5 px-3 text-sm font-medium border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+            className={`flex-1 py-1.5 px-3 text-sm font-medium ${UI.border} text-slate-600 ${UI.hoverBg} transition-colors cursor-pointer`}
           >
             취소
           </button>

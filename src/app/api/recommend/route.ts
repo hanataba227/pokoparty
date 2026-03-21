@@ -7,6 +7,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { getApiErrorMessage } from "@/lib/api-error";
+import type { PokemonType } from "@/types/pokemon";
 import {
   loadPokemonData,
   loadStoryData,
@@ -35,18 +36,14 @@ export async function POST(request: NextRequest) {
         excludeTradeEvolution?: boolean;
         excludeItemEvolution?: boolean;
         includeStarters?: boolean;
+        finalOnly?: boolean;
+        gen8Only?: boolean;
+        selectedTypes?: string[];
         gameVersion?: 'sword' | 'shield';
       };
     };
 
     // 유효성 검사
-    if (!storyPointId) {
-      return NextResponse.json(
-        { error: "스토리 포인트 ID가 필요합니다." },
-        { status: 400 }
-      );
-    }
-
     if (!Array.isArray(fixedPokemon)) {
       return NextResponse.json(
         { error: "고정 포켓몬 목록이 올바르지 않습니다." },
@@ -59,13 +56,16 @@ export async function POST(request: NextRequest) {
     const storyData = loadStoryData();
     const typeChart = loadTypeChart();
 
-    // 스토리 포인트 찾기
-    const storyPoint = storyData.find((sp) => sp.id === storyPointId);
-    if (!storyPoint) {
-      return NextResponse.json(
-        { error: `스토리 포인트를 찾을 수 없습니다: ${storyPointId}` },
-        { status: 404 }
-      );
+    // 스토리 포인트 찾기 (optional — 없으면 자유 추천)
+    let storyPoint;
+    if (storyPointId) {
+      storyPoint = storyData.find((sp) => sp.id === storyPointId);
+      if (!storyPoint) {
+        return NextResponse.json(
+          { error: `스토리 포인트를 찾을 수 없습니다: ${storyPointId}` },
+          { status: 404 }
+        );
+      }
     }
 
     // 고정 포켓몬 조회
@@ -83,7 +83,10 @@ export async function POST(request: NextRequest) {
       typeChart,
       allPokemon,
       slotsToFill,
-      filters
+      filters ? {
+        ...filters,
+        selectedTypes: filters.selectedTypes as PokemonType[] | undefined,
+      } : undefined
     );
 
     return NextResponse.json({

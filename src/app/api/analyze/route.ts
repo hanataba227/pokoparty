@@ -14,7 +14,6 @@ import {
   calculateOffensiveCoverage,
   getDefensiveMatchups,
 } from "@/lib/type-calc";
-import { classifyRole, calculateRoleBalance } from "@/lib/roles";
 import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
@@ -70,31 +69,27 @@ export async function POST(request: NextRequest) {
     const coverage = calculateOffensiveCoverage(partyAttackTypes, typeChart);
 
     // 방어 분석 (파티 전체)
+    // 각 멤버의 방어 배율을 한 번만 계산
+    const memberMatchups = partyTypes.map((types) => getDefensiveMatchups(types, typeChart));
+
     // 각 타입에 대한 최적 방어 배율
     const typeMatchups: Partial<Record<PokemonType, number>> = {};
-    for (const atkType of ALL_TYPES) {
-      let bestDefense = Infinity;
-      for (const memberTypes of partyTypes) {
-        const matchups = getDefensiveMatchups(memberTypes, typeChart);
-        bestDefense = Math.min(bestDefense, matchups[atkType]);
-      }
-      typeMatchups[atkType] = bestDefense;
-    }
-
-    // 약점: 파티 전체가 취약한 타입 (모든 멤버에게 효과적인 타입)
     const weaknesses: PokemonType[] = [];
     const resistances: PokemonType[] = [];
-    for (const atkType of ALL_TYPES) {
-      // 약점: 파티 중 절반 이상이 약점인 타입
-      const weakCount = partyTypes.filter((types) => {
-        const matchups = getDefensiveMatchups(types, typeChart);
-        return matchups[atkType] > 1;
-      }).length;
-      const resistCount = partyTypes.filter((types) => {
-        const matchups = getDefensiveMatchups(types, typeChart);
-        return matchups[atkType] < 1;
-      }).length;
 
+    for (const atkType of ALL_TYPES) {
+      let bestDefense = Infinity;
+      let weakCount = 0;
+      let resistCount = 0;
+
+      for (const matchups of memberMatchups) {
+        const mult = matchups[atkType];
+        bestDefense = Math.min(bestDefense, mult);
+        if (mult > 1) weakCount++;
+        if (mult < 1) resistCount++;
+      }
+
+      typeMatchups[atkType] = bestDefense;
       if (weakCount > party.length / 2) {
         weaknesses.push(atkType);
       }
@@ -106,17 +101,11 @@ export async function POST(request: NextRequest) {
     // 커버리지 점수 (18타입 중 몇 타입을 효과적으로 공격 가능한지)
     const coverageScore = Math.round((coverage.length / ALL_TYPES.length) * 100);
 
-    // 밸런스 점수 (역할 밸런스)
-    const roles = party.map((p) => classifyRole(p));
-    const roleBalance = calculateRoleBalance(roles);
-    const balanceScore = roleBalance.score;
-
     const analysis: AnalysisResult = {
       coverage,
       weaknesses,
       resistances,
       coverageScore,
-      balanceScore,
       typeMatchups: typeMatchups as Record<PokemonType, number>,
     };
 

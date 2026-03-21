@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { createBrowserSupabase } from '@/lib/supabase-browser';
 import { getAuthErrorMessage } from '@/lib/auth-error';
+import { UI } from '@/lib/ui-tokens';
 
 export default function ResetPasswordPage() {
   const [email, setEmail] = useState('');
@@ -50,7 +51,7 @@ export default function ResetPasswordPage() {
           <p className="mt-2 text-slate-600">비밀번호 재설정</p>
         </div>
 
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <div className={`${UI.pageBg} p-6 rounded-xl border ${UI.rowBorder} shadow-sm`}>
           {success ? (
             <div className="text-center space-y-4">
               <div className="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center">
@@ -93,7 +94,7 @@ export default function ResetPasswordPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="email@example.com"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
+                  className={`w-full px-3 py-2 border ${UI.rowBorder} rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors`}
                   autoComplete="email"
                 />
               </div>
