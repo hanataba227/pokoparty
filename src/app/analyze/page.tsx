@@ -1,30 +1,18 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import dynamic from 'next/dynamic';
-import type { Pokemon, AnalysisResult } from '@/types/pokemon';
+import type { Pokemon, AnalysisResult, GradeInfo, PartyGrade, SavedParty } from '@/types/pokemon';
 import { ALL_TYPES } from '@/lib/type-calc';
+import { getGradeColor, getGradeLabel, getGradeBgColor } from '@/lib/party-grade';
+import { getClientErrorMessage } from '@/lib/error-utils';
 import PartySlot from '@/components/PartySlot';
 import PokemonSearchModal from '@/components/PokemonSearchModal';
 import TypeBadge from '@/components/TypeBadge';
-import { Loader2, BarChart3, Shield, Swords, AlertTriangle, FolderOpen } from 'lucide-react';
+import { Loader2, BarChart3, Shield, Swords, AlertTriangle, FolderOpen, Lightbulb } from 'lucide-react';
 import { UI } from '@/lib/ui-tokens';
 import { cachedFetch } from '@/lib/client-cache';
 import { useAuth } from '@/contexts/AuthContext';
-
-/** recharts を dynamic import (~400KB 번들 분리) */
-const RechartsRadar = dynamic(
-  () => import('@/components/RechartsRadar'),
-  {
-    loading: () => (
-      <div className="w-full h-[400px] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
-      </div>
-    ),
-    ssr: false,
-  }
-);
 
 /** 종합 점수 등급 색상 */
 function getScoreColor(score: number): string {
@@ -53,43 +41,36 @@ export default function AnalyzePage() {
   );
 }
 
-/** 저장된 파티 타입 */
-interface SavedParty {
-  id: string;
-  name: string;
-  pokemon_ids: number[];
-  created_at: string;
-}
-
 function AnalyzeContent() {
   const searchParams = useSearchParams();
   const { user } = useAuth();
 
-  // 파티 상태 (최대 6마리) — null로 통일 (빈 슬롯 = null)
   const [party, setParty] = useState<(Pokemon | null)[]>([null, null, null, null, null, null]);
   const [modalOpen, setModalOpen] = useState(false);
   const [activeSlot, setActiveSlot] = useState<number>(0);
 
-  // 포켓몬 목록
   const [allPokemon, setAllPokemon] = useState<Pokemon[]>([]);
   const [pokemonLoading, setPokemonLoading] = useState(true);
   const [pokemonError, setPokemonError] = useState<string | null>(null);
 
-  // 분석 결과
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
-  // 내 파티 가져오기 상태
   const [savedParties, setSavedParties] = useState<SavedParty[]>([]);
   const [partyListOpen, setPartyListOpen] = useState(false);
   const [partyLoading, setPartyLoading] = useState(false);
   const [partyLoadError, setPartyLoadError] = useState<string | null>(null);
 
-  // URL에서 전달된 pokemon_ids 자동 세팅 여부
   const autoAnalyzeDone = useRef(false);
+  const partyListRef = useRef<HTMLDivElement>(null);
 
-  // 포켓몬 목록 로드 (클라이언트 캐시 적용)
+  const pokemonMap = useMemo(() => {
+    const map = new Map<number, Pokemon>();
+    for (const p of allPokemon) map.set(p.id, p);
+    return map;
+  }, [allPokemon]);
+
   useEffect(() => {
     async function fetchPokemon() {
       try {
@@ -101,7 +82,7 @@ function AnalyzeContent() {
         });
         setAllPokemon(data.pokemon);
       } catch (err) {
-        setPokemonError(err instanceof Error ? err.message : '알 수 없는 오류');
+        setPokemonError(getClientErrorMessage(err));
       } finally {
         setPokemonLoading(false);
       }
@@ -109,48 +90,51 @@ function AnalyzeContent() {
     fetchPokemon();
   }, []);
 
-  // URL의 pokemon_ids로 파티 자동 세팅
   const [shouldAutoAnalyze, setShouldAutoAnalyze] = useState(false);
 
   useEffect(() => {
     if (autoAnalyzeDone.current || allPokemon.length === 0) return;
-
     const idsParam = searchParams.get('pokemon_ids');
     if (!idsParam) return;
-
     const ids = idsParam.split(',').map(Number).filter((id) => !isNaN(id) && id > 0);
     if (ids.length === 0) return;
-
     const newParty: (Pokemon | null)[] = [null, null, null, null, null, null];
     ids.slice(0, 6).forEach((id, i) => {
-      const found = allPokemon.find((p) => p.id === id);
+      const found = pokemonMap.get(id);
       if (found) newParty[i] = found;
     });
-
     setParty(newParty);
     setShouldAutoAnalyze(true);
     autoAnalyzeDone.current = true;
-  }, [allPokemon, searchParams]);
+  }, [allPokemon, pokemonMap, searchParams]);
 
-  // 슬롯 클릭 → 모달 열기
+  // 드롭다운 외부 클릭 닫기 (#49)
+  useEffect(() => {
+    if (!partyListOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (partyListRef.current && !partyListRef.current.contains(e.target as Node)) {
+        setPartyListOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [partyListOpen]);
+
   const handleSlotClick = (index: number) => {
     setActiveSlot(index);
     setModalOpen(true);
   };
 
-  // 포켓몬 선택
   const handleSelect = (pokemon: Pokemon) => {
     setParty((prev) => {
       const next = [...prev];
       next[activeSlot] = pokemon;
       return next;
     });
-    // 분석 결과 초기화
     setAnalysis(null);
     setAnalyzeError(null);
   };
 
-  // 포켓몬 제거
   const handleRemove = (index: number) => {
     setParty((prev) => {
       const next = [...prev];
@@ -161,7 +145,6 @@ function AnalyzeContent() {
     setAnalyzeError(null);
   };
 
-  // 내 파티 목록 불러오기
   const handleLoadMyParties = useCallback(async () => {
     if (partyListOpen) {
       setPartyListOpen(false);
@@ -179,36 +162,31 @@ function AnalyzeContent() {
       setSavedParties(data.parties ?? []);
       setPartyListOpen(true);
     } catch (err) {
-      setPartyLoadError(err instanceof Error ? err.message : '알 수 없는 오류');
+      setPartyLoadError(getClientErrorMessage(err));
     } finally {
       setPartyLoading(false);
     }
   }, [partyListOpen]);
 
-  // 저장된 파티 선택 시 슬롯에 적용
   const handleSelectSavedParty = useCallback((savedParty: SavedParty) => {
     const newParty: (Pokemon | null)[] = [null, null, null, null, null, null];
     savedParty.pokemon_ids.slice(0, 6).forEach((id, i) => {
-      const found = allPokemon.find((p) => p.id === id);
+      const found = pokemonMap.get(id);
       if (found) newParty[i] = found;
     });
     setParty(newParty);
     setPartyListOpen(false);
     setAnalysis(null);
     setAnalyzeError(null);
-  }, [allPokemon]);
+  }, [pokemonMap]);
 
-  // 선택된 포켓몬 수
   const selectedCount = party.filter((p) => p !== null).length;
 
-  // 분석 실행
   const handleAnalyze = useCallback(async () => {
     const pokemonIds = party
       .filter((p): p is Pokemon => p !== null)
       .map((p) => String(p.id));
-
     if (pokemonIds.length === 0) return;
-
     try {
       setAnalyzing(true);
       setAnalyzeError(null);
@@ -224,13 +202,12 @@ function AnalyzeContent() {
       const data = await res.json();
       setAnalysis(data.analysis);
     } catch (err) {
-      setAnalyzeError(err instanceof Error ? err.message : '알 수 없는 오류');
+      setAnalyzeError(getClientErrorMessage(err));
     } finally {
       setAnalyzing(false);
     }
   }, [party]);
 
-  // URL에서 파티 세팅 후 자동 분석 실행
   useEffect(() => {
     if (shouldAutoAnalyze) {
       setShouldAutoAnalyze(false);
@@ -238,18 +215,7 @@ function AnalyzeContent() {
     }
   }, [shouldAutoAnalyze, handleAnalyze]);
 
-  // 레이더 차트 데이터 변환
-  const radarData = analysis
-    ? ALL_TYPES.map((type) => ({
-        type,
-        value: analysis.typeMatchups[type] ?? 1,
-      }))
-    : [];
-
-  // 종합 점수
-  const totalScore = analysis
-    ? analysis.coverageScore
-    : 0;
+  const totalScore = analysis ? analysis.coverageScore : 0;
 
   return (
     <div className={`min-h-screen ${UI.pageBg}`}>
@@ -264,39 +230,20 @@ function AnalyzeContent() {
           </p>
         </div>
 
-        {/* 파티 선택 영역 */}
+        {/* 파티 구성 영역 — 내 파티 가져오기를 오른쪽에 배치 */}
         <div className={`${UI.pageBg} rounded-2xl shadow-sm border ${UI.rowBorder} p-6 mb-8`}>
-          <h2 className="text-lg font-semibold text-slate-900 mb-4">
-            파티 구성
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-slate-900">
+              파티 구성
+            </h2>
 
-          {pokemonError && (
-            <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
-              {pokemonError}
-            </div>
-          )}
-
-          {/* 슬롯 6개 */}
-          <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
-            {party.map((pokemon, index) => (
-              <PartySlot
-                key={index}
-                slotNumber={index + 1}
-                pokemon={pokemon ?? undefined}
-                onAdd={() => handleSlotClick(index)}
-                onRemove={pokemon ? () => handleRemove(index) : undefined}
-              />
-            ))}
-          </div>
-
-          {/* 내 파티 가져오기 + 분석하기 버튼 */}
-          <div className="mt-6 flex flex-col items-center gap-3">
+            {/* 내 파티 가져오기 — 오른쪽 상단 */}
             {user && (
-              <div className="w-full max-w-sm">
+              <div className="relative" ref={partyListRef}>
                 <button
                   onClick={handleLoadMyParties}
                   disabled={partyLoading || pokemonLoading}
-                  className={`inline-flex items-center justify-center gap-2 w-full px-5 py-2.5 rounded-xl
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl
                     border-2 font-medium text-sm
                     ${partyListOpen
                       ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
@@ -315,11 +262,11 @@ function AnalyzeContent() {
                 </button>
 
                 {partyLoadError && (
-                  <p className="mt-2 text-xs text-red-500 text-center">{partyLoadError}</p>
+                  <p className="absolute right-0 mt-1 text-xs text-red-500 whitespace-nowrap">{partyLoadError}</p>
                 )}
 
                 {partyListOpen && (
-                  <div className={`mt-2 rounded-xl border ${UI.rowBorder} bg-white shadow-lg overflow-hidden`}>
+                  <div className={`absolute right-0 mt-2 w-max min-w-72 rounded-xl border ${UI.rowBorder} bg-white shadow-lg overflow-hidden z-10`}>
                     {savedParties.length === 0 ? (
                       <div className="px-4 py-6 text-center text-sm text-slate-400">
                         저장된 파티가 없습니다.
@@ -341,16 +288,11 @@ function AnalyzeContent() {
                                   {sp.pokemon_ids.length}마리
                                 </span>
                               </div>
-                              <div className="mt-1 flex gap-1">
+                              <p className="mt-1 text-xs text-slate-500 whitespace-nowrap">
                                 {sp.pokemon_ids.slice(0, 6).map((id) => {
-                                  const found = allPokemon.find((p) => p.id === id);
-                                  return (
-                                    <span key={id} className="text-xs text-slate-500">
-                                      {found?.name ?? `#${id}`}
-                                    </span>
-                                  );
-                                })}
-                              </div>
+                                  return pokemonMap.get(id)?.name ?? `#${id}`;
+                                }).join(', ')}
+                              </p>
                             </button>
                           </li>
                         ))}
@@ -360,7 +302,29 @@ function AnalyzeContent() {
                 )}
               </div>
             )}
+          </div>
 
+          {pokemonError && (
+            <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+              {pokemonError}
+            </div>
+          )}
+
+          {/* 슬롯 6개 */}
+          <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
+            {party.map((pokemon, index) => (
+              <PartySlot
+                key={index}
+                slotNumber={index + 1}
+                pokemon={pokemon ?? undefined}
+                onAdd={() => handleSlotClick(index)}
+                onRemove={pokemon ? () => handleRemove(index) : undefined}
+              />
+            ))}
+          </div>
+
+          {/* 분석하기 버튼 */}
+          <div className="mt-6 flex justify-center">
             <button
               onClick={handleAnalyze}
               disabled={selectedCount < 1 || analyzing || pokemonLoading}
@@ -397,50 +361,35 @@ function AnalyzeContent() {
         {/* 분석 결과 */}
         {analysis && (
           <div className="space-y-6">
-            {/* 종합 점수 */}
-            <div className={`${UI.pageBg} rounded-2xl shadow-sm border ${UI.rowBorder} p-6`}>
-              <h2 className="text-lg font-semibold text-slate-900 mb-4">
-                종합 점수
-              </h2>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-6 sm:gap-12">
-                {/* 총점 */}
-                <div className="text-center">
-                  <div className={`text-6xl font-bold ${getScoreColor(totalScore)}`}>
-                    {totalScore}
-                  </div>
-                  <div className="text-sm text-slate-500 mt-1">
-                    종합 ({getScoreLabel(totalScore)})
-                  </div>
-                </div>
-                {/* 세부 점수 */}
-                <div className="flex gap-8">
-                  <div className="text-center">
-                    <div className={`text-3xl font-bold ${getScoreColor(analysis.coverageScore)}`}>
-                      {analysis.coverageScore}
+            {/* 종합 점수 + 약점/내성 — 3컬럼 */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              {/* 종합 점수 / 등급 */}
+              <div className={`${UI.pageBg} rounded-2xl shadow-sm border ${UI.rowBorder} p-6 flex flex-col items-center justify-center`}>
+                {analysis.gradeInfo ? (
+                  <>
+                    <h2 className="text-sm font-semibold text-slate-500 mb-3">파티 등급</h2>
+                    <div className={`text-7xl font-black ${getGradeColor(analysis.gradeInfo.grade)}`}>
+                      {analysis.gradeInfo.grade}
                     </div>
-                    <div className="text-xs text-slate-500 mt-1">
-                      커버리지
+                    <div className="text-sm text-slate-500 mt-2">
+                      {analysis.gradeInfo.totalScore}점 · {getGradeLabel(analysis.gradeInfo.grade)}
                     </div>
-                  </div>
-                </div>
+                  </>
+                ) : (
+                  <>
+                    <h2 className="text-sm font-semibold text-slate-500 mb-3">
+                      종합 점수
+                    </h2>
+                    <div className={`text-6xl font-bold ${getScoreColor(totalScore)}`}>
+                      {totalScore}
+                    </div>
+                    <div className="text-sm text-slate-500 mt-2">
+                      {getScoreLabel(totalScore)}
+                    </div>
+                  </>
+                )}
               </div>
-            </div>
 
-            {/* 타입 커버리지 레이더 차트 — dynamic import */}
-            <div className={`${UI.pageBg} rounded-2xl shadow-sm border ${UI.rowBorder} p-6`}>
-              <h2 className="text-lg font-semibold text-slate-900 mb-4">
-                타입 방어 매치업
-              </h2>
-              <p className="text-sm text-slate-500 mb-4">
-                1.0 이상일수록 해당 타입에 취약하고, 1.0 미만일수록 내성이 있습니다.
-              </p>
-              <div className="w-full h-[400px] sm:h-[450px]">
-                <RechartsRadar data={radarData} />
-              </div>
-            </div>
-
-            {/* 약점 / 내성 목록 */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {/* 약점 */}
               <div className={`${UI.pageBg} rounded-2xl shadow-sm border ${UI.rowBorder} p-6`}>
                 <div className="flex items-center gap-2 mb-4">
@@ -503,6 +452,60 @@ function AnalyzeContent() {
                 )}
               </div>
             </div>
+
+            {/* 세부 점수 프로그레스 바 */}
+            {analysis.gradeInfo && (
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-300 p-6">
+                <h2 className="text-lg font-semibold text-slate-900 mb-4">세부 점수</h2>
+                <div className="space-y-4">
+                  {/* 공격 커버리지 */}
+                  <div>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-slate-600">공격 커버리지</span>
+                      <span className="font-semibold text-slate-900">{analysis.gradeInfo.breakdown.offense}</span>
+                    </div>
+                    <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${analysis.gradeInfo.breakdown.offense}%` }} />
+                    </div>
+                  </div>
+                  {/* 방어 밸런스 */}
+                  <div>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-slate-600">방어 밸런스</span>
+                      <span className="font-semibold text-slate-900">{analysis.gradeInfo.breakdown.defense}</span>
+                    </div>
+                    <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-red-400 rounded-full" style={{ width: `${analysis.gradeInfo.breakdown.defense}%` }} />
+                    </div>
+                  </div>
+                  {/* 타입 다양성 */}
+                  <div>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-slate-600">타입 다양성</span>
+                      <span className="font-semibold text-slate-900">{analysis.gradeInfo.breakdown.diversity}</span>
+                    </div>
+                    <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${analysis.gradeInfo.breakdown.diversity}%` }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 개선 제안 */}
+            {analysis.gradeInfo && analysis.gradeInfo.suggestions.length > 0 && (
+              <div className="bg-amber-50 rounded-2xl border border-amber-200 p-6">
+                <h2 className="text-lg font-semibold text-amber-800 mb-3">개선 제안</h2>
+                <ul className="space-y-2">
+                  {analysis.gradeInfo.suggestions.map((s, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-amber-700">
+                      <Lightbulb className="w-4 h-4 shrink-0 mt-0.5" />
+                      {s}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* 공격 커버리지 */}
             <div className={`${UI.pageBg} rounded-2xl shadow-sm border ${UI.rowBorder} p-6`}>

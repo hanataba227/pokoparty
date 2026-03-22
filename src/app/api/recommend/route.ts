@@ -79,35 +79,20 @@ export const POST = withRateLimit(async (request: NextRequest) => {
           { status: 400 },
         );
       }
-      if (filters.excludeTradeEvolution !== undefined && typeof filters.excludeTradeEvolution !== "boolean") {
-        return NextResponse.json(
-          { error: "필터 옵션(excludeTradeEvolution)이 올바르지 않습니다." },
-          { status: 400 },
-        );
-      }
-      if (filters.excludeItemEvolution !== undefined && typeof filters.excludeItemEvolution !== "boolean") {
-        return NextResponse.json(
-          { error: "필터 옵션(excludeItemEvolution)이 올바르지 않습니다." },
-          { status: 400 },
-        );
-      }
-      if (filters.includeStarters !== undefined && typeof filters.includeStarters !== "boolean") {
-        return NextResponse.json(
-          { error: "필터 옵션(includeStarters)이 올바르지 않습니다." },
-          { status: 400 },
-        );
-      }
-      if (filters.finalOnly !== undefined && typeof filters.finalOnly !== "boolean") {
-        return NextResponse.json(
-          { error: "필터 옵션(finalOnly)이 올바르지 않습니다." },
-          { status: 400 },
-        );
-      }
-      if (filters.gen8Only !== undefined && typeof filters.gen8Only !== "boolean") {
-        return NextResponse.json(
-          { error: "필터 옵션(gen8Only)이 올바르지 않습니다." },
-          { status: 400 },
-        );
+      const booleanFields = [
+        "excludeTradeEvolution",
+        "excludeItemEvolution",
+        "includeStarters",
+        "finalOnly",
+        "gen8Only",
+      ] as const;
+      for (const field of booleanFields) {
+        if (filters[field] !== undefined && typeof filters[field] !== "boolean") {
+          return NextResponse.json(
+            { error: `필터 옵션(${field})이 올바르지 않습니다.` },
+            { status: 400 },
+          );
+        }
       }
       if (filters.selectedTypes !== undefined) {
         if (!Array.isArray(filters.selectedTypes) || filters.selectedTypes.some((t) => typeof t !== "string")) {
@@ -136,7 +121,7 @@ export const POST = withRateLimit(async (request: NextRequest) => {
       storyPoint = storyData.find((sp) => sp.id === storyPointId);
       if (!storyPoint) {
         return NextResponse.json(
-          { error: `스토리 포인트를 찾을 수 없습니다: ${storyPointId}` },
+          { error: "해당 스토리 포인트를 찾을 수 없습니다." },
           { status: 404 }
         );
       }

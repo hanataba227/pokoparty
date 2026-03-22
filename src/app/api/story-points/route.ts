@@ -9,16 +9,10 @@ import { withRateLimit } from "@/lib/rate-limit";
 
 export const GET = withRateLimit(async (request: NextRequest) => {
   try {
-    const gameId = request.nextUrl.searchParams.get("gameId");
     const storyPoints = loadStoryData();
 
     // gym 타입만 필터링
     const gymPoints = storyPoints.filter((sp) => sp.type === "gym");
-
-    // TODO: gameId 기반 필터링 (멀티 게임 데이터 지원 시 활성화)
-    if (gameId) {
-      console.log(`[story-points] gameId=${gameId} 요청 수신`);
-    }
 
     return NextResponse.json({ storyPoints: gymPoints });
   } catch (error) {

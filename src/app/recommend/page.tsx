@@ -4,12 +4,13 @@ import StepIndicator from '@/components/StepIndicator';
 import PartySlot from '@/components/PartySlot';
 import PokemonSearchModal from '@/components/PokemonSearchModal';
 import PokemonCard from '@/components/PokemonCard';
+import GameSelector from '@/components/GameSelector';
 import { Loader2, ChevronLeft, ChevronRight, ChevronDown, SkipForward, Save, LogIn, SlidersHorizontal, Filter } from 'lucide-react';
 import { TYPE_COLORS } from '@/components/TypeBadge';
 import { UI } from '@/lib/ui-tokens';
 import { ALL_TYPES } from '@/lib/type-calc';
 import Link from 'next/link';
-import { useRecommendState, GAME_TITLES } from '@/hooks/useRecommendState';
+import { useRecommendState } from '@/hooks/useRecommendState';
 
 const STEPS = ['게임 선택', '고정 포켓몬', '추천 결과'];
 
@@ -22,6 +23,8 @@ export default function RecommendPage() {
     goPrev,
     selectedGameId,
     setSelectedGameId,
+    includeDlc,
+    setIncludeDlc,
     fixedPokemon,
     modalOpen,
     setModalOpen,
@@ -72,42 +75,12 @@ export default function RecommendPage() {
               플레이 중인 게임 타이틀을 선택해주세요.
             </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-3xl mx-auto">
-              {GAME_TITLES.map((game) => (
-                <button
-                  key={game.id}
-                  onClick={() => !game.disabled && setSelectedGameId(game.id)}
-                  disabled={!!game.disabled}
-                  className={`relative flex flex-col items-center gap-3 p-6 rounded-xl border-2 transition-all duration-200
-                    ${game.disabled
-                      ? 'border-slate-300 bg-white opacity-50 cursor-not-allowed'
-                      : selectedGameId === game.id
-                        ? 'border-indigo-500 bg-indigo-50 shadow-md'
-                        : 'border-slate-300 bg-white hover:border-indigo-300 cursor-pointer'
-                    }`}
-                >
-                  <span className="text-3xl">{game.icon}</span>
-                  <span className={`font-bold text-lg ${selectedGameId === game.id
-                    ? 'text-indigo-600'
-                    : 'text-slate-800'
-                    }`}>
-                    {game.label}
-                  </span>
-                  {game.disabled && (
-                    <span className="text-xs text-slate-400">
-                      준비 중
-                    </span>
-                  )}
-                  {selectedGameId === game.id && (
-                    <div className="absolute top-2 right-2 w-5 h-5 bg-indigo-500 rounded-full flex items-center justify-center">
-                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                  )}
-                </button>
-              ))}
-            </div>
+            <GameSelector
+              selectedGameId={selectedGameId}
+              onSelect={(id) => setSelectedGameId(id === selectedGameId ? null : id)}
+              includeDlc={includeDlc}
+              onDlcToggle={setIncludeDlc}
+            />
           </div>
         )}
 

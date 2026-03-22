@@ -33,6 +33,9 @@ const PokemonCard = memo(function PokemonCard({ pokemon, score, detailedReasons,
   return (
     <div
       onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
       className={`relative bg-white border rounded-xl ${compact ? 'p-2 sm:p-3' : 'p-4'}
         hover:shadow-sm transition-all duration-200
         ${isFixed
@@ -48,22 +51,40 @@ const PokemonCard = memo(function PokemonCard({ pokemon, score, detailedReasons,
         </div>
       )}
 
-      {/* 포켓몬 이미지 + 이름 (클릭 시 도감 페이지로 이동) */}
-      <Link href={`/pokemon/${pokemon.id}`} onClick={(e) => e.stopPropagation()}>
-        <div className={`${compact ? 'w-12 h-12 sm:w-16 sm:h-16 mb-1.5' : 'w-20 h-20 mb-3'} mx-auto relative`}>
-          <Image
-            src={spriteUrl}
-            alt={pokemon.name}
-            width={compact ? 64 : 80}
-            height={compact ? 64 : 80}
-            className="w-full h-full object-contain"
-            unoptimized
-          />
-        </div>
-        <h3 className={`text-center font-bold text-slate-900 hover:text-indigo-600 transition-colors ${compact ? 'text-xs sm:text-sm' : 'text-lg'}`}>
-          {pokemon.name}
-        </h3>
-      </Link>
+      {/* 포켓몬 이미지 + 이름 (onClick이 없으면 도감 페이지로 이동, 있으면 선택 동작) */}
+      {onClick ? (
+        <>
+          <div className={`${compact ? 'w-12 h-12 sm:w-16 sm:h-16 mb-1.5' : 'w-20 h-20 mb-3'} mx-auto relative`}>
+            <Image
+              src={spriteUrl}
+              alt={pokemon.name}
+              width={compact ? 64 : 80}
+              height={compact ? 64 : 80}
+              className="w-full h-full object-contain"
+
+            />
+          </div>
+          <h3 className={`text-center font-bold text-slate-900 ${compact ? 'text-xs sm:text-sm' : 'text-lg'}`}>
+            {pokemon.name}
+          </h3>
+        </>
+      ) : (
+        <Link href={`/pokemon/${pokemon.id}`}>
+          <div className={`${compact ? 'w-12 h-12 sm:w-16 sm:h-16 mb-1.5' : 'w-20 h-20 mb-3'} mx-auto relative`}>
+            <Image
+              src={spriteUrl}
+              alt={pokemon.name}
+              width={compact ? 64 : 80}
+              height={compact ? 64 : 80}
+              className="w-full h-full object-contain"
+
+            />
+          </div>
+          <h3 className={`text-center font-bold text-slate-900 hover:text-indigo-600 transition-colors ${compact ? 'text-xs sm:text-sm' : 'text-lg'}`}>
+            {pokemon.name}
+          </h3>
+        </Link>
+      )}
       {!compact && (
         <p className="text-center text-slate-400 text-sm">
           #{String(pokemon.id).padStart(3, '0')}

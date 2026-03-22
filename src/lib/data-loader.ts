@@ -49,8 +49,33 @@ const TYPE_EN_TO_KO: Record<string, PokemonType> = {
 // 공유 상수
 // ========================================
 
-/** 스타터 포켓몬 진화 라인 ID (8세대) */
-export const STARTER_IDS = [810, 811, 812, 813, 814, 815, 816, 817, 818];
+/** 세대별 스타터 포켓몬 진화 라인 ID (1~9세대) */
+const STARTER_IDS_BY_GEN: Record<string, number[]> = {
+  gen1: [1, 2, 3, 4, 5, 6, 7, 8, 9],           // 이상해씨~리자몽~거북왕
+  gen2: [152, 153, 154, 155, 156, 157, 158, 159, 160], // 치코리타~블레이범~장크로다일
+  gen3: [252, 253, 254, 255, 256, 257, 258, 259, 260], // 나무지기~번치코~대짱이
+  gen4: [387, 388, 389, 390, 391, 392, 393, 394, 395], // 모부기~초염몽~엠페르트
+  gen5: [495, 496, 497, 498, 499, 500, 501, 502, 503], // 주리비얀~엠보어~대검귀
+  gen6: [650, 651, 652, 653, 654, 655, 656, 657, 658], // 도치마론~마폭시~개굴닌자
+  gen7: [722, 723, 724, 725, 726, 727, 728, 729, 730], // 나몰빼미~어흥염~누리레느
+  gen8: [810, 811, 812, 813, 814, 815, 816, 817, 818], // 흥나숭~고릴타~인텔리레온
+  gen9: [906, 907, 908, 909, 910, 911, 912, 913, 914], // 뉴초모~라우드본~웨니발
+};
+
+/** 스타터 포켓몬 진화 라인 ID (기본: 8세대, backward compatible) */
+export const STARTER_IDS = STARTER_IDS_BY_GEN.gen8;
+
+/**
+ * 게임 ID에 해당하는 세대의 스타터 ID 배열 반환
+ * @param gameId - 'gen8-sword' 등의 gameId. 없으면 8세대 기본값.
+ */
+export function getStarterIdsForGame(gameId?: string): number[] {
+  if (!gameId) return STARTER_IDS;
+  const genMatch = gameId.match(/^gen(\d+)/);
+  if (!genMatch) return STARTER_IDS;
+  const genKey = `gen${genMatch[1]}`;
+  return STARTER_IDS_BY_GEN[genKey] ?? STARTER_IDS;
+}
 
 // ========================================
 // 특성 점수 데이터
@@ -68,34 +93,36 @@ interface AbilityScoresFile {
   abilities: Record<string, AbilityScoreEntry>;
 }
 
-let abilityScoresCache: Record<string, AbilityScoreEntry> | null = null;
+// ========================================
+// 통합 메모리 캐시 (#11)
+// ========================================
+
+/** 모든 데이터 캐시를 단일 Map으로 통합 관리 */
+const dataCache = new Map<string, unknown>();
+
+/** 타입 안전 캐시 getter */
+function cGet<T>(key: string): T | null {
+  return (dataCache.get(key) as T) ?? null;
+}
+
+/** 타입 안전 캐시 setter */
+function cSet<T>(key: string, value: T): void {
+  dataCache.set(key, value);
+}
 
 export function loadAbilityScores(): Record<string, AbilityScoreEntry> {
-  if (abilityScoresCache) return abilityScoresCache;
+  const cached = cGet<Record<string, AbilityScoreEntry>>("abilityScores");
+  if (cached) return cached;
   const filePath = getDataPath("scoring", "ability-scores.json");
   if (!fs.existsSync(filePath)) {
-    abilityScoresCache = {};
-    return abilityScoresCache;
+    cSet("abilityScores", {});
+    return {};
   }
   const raw = fs.readFileSync(filePath, "utf-8");
   const data = JSON.parse(raw) as AbilityScoresFile;
-  abilityScoresCache = data.abilities;
-  return abilityScoresCache;
+  cSet("abilityScores", data.abilities);
+  return data.abilities;
 }
-
-// ========================================
-// 메모리 캐시
-// ========================================
-
-let pokemonCache: Pokemon[] | null = null;
-let pokemonCacheVersion: string | null = null;
-let pokemonNameEnToIdCache: Map<string, number> | null = null;
-let movesCache: Map<number, Move[]> | null = null;
-let movesCacheVersion: string | null = null;
-let storyPointsCache: StoryPoint[] | null = null;
-let encountersCache: Encounter[] | null = null;
-let gymsCache: Gym[] | null = null;
-let typeChartCache: TypeChart | null = null;
 
 // ========================================
 // 유틸리티
@@ -125,8 +152,34 @@ function convertTypeToKo(typeEn: string): PokemonType {
 }
 
 // ========================================
-// 게임 버전별 JSON 파일 선택
+// 게임 ID → 파일명 매핑
 // ========================================
+
+/**
+ * 게임 ID → 각 데이터 카테고리의 JSON 파일명 매핑
+ * 키: GAME_TITLES의 id (예: 'gen8-swsh-sword') 또는 내부 gameVersion
+ * 값: { pokemon, story, gyms, encounters } 파일명
+ */
+interface GameFileMapping {
+  pokemon: string;
+  story: string;
+  gyms: string;
+  encounters: string;
+}
+
+const GAME_FILE_MAP: Record<string, GameFileMapping> = {
+  // 8세대 소드/실드
+  "sword": { pokemon: "gen8-sword-pokemon.json", story: "gen8-sword-story.json", gyms: "gen8-sword-gyms.json", encounters: "gen8-sword-encounters.json" },
+  "shield": { pokemon: "gen8-shield-pokemon.json", story: "gen8-shield-story.json", gyms: "gen8-shield-gyms.json", encounters: "gen8-shield-encounters.json" },
+  "gen8-swsh-sword": { pokemon: "gen8-sword-pokemon.json", story: "gen8-sword-story.json", gyms: "gen8-sword-gyms.json", encounters: "gen8-sword-encounters.json" },
+  "gen8-swsh-shield": { pokemon: "gen8-shield-pokemon.json", story: "gen8-shield-story.json", gyms: "gen8-shield-gyms.json", encounters: "gen8-shield-encounters.json" },
+};
+
+/** gameVersion/gameId에서 파일 매핑 조회. 없으면 기본값(sword) 반환. */
+function getGameFiles(gameId?: string): GameFileMapping {
+  if (gameId && GAME_FILE_MAP[gameId]) return GAME_FILE_MAP[gameId];
+  return GAME_FILE_MAP["sword"];
+}
 
 type GameVersion = "sword" | "shield";
 
@@ -137,11 +190,7 @@ type GameVersion = "sword" | "shield";
  * - undefined → gen8-sword-pokemon.json (기본값: sword)
  */
 function getPokemonJsonFilename(gameVersion?: GameVersion): string {
-  if (gameVersion === "shield") {
-    const shieldPath = getDataPath("pokemon", "gen8-shield-pokemon.json");
-    if (fs.existsSync(shieldPath)) return "gen8-shield-pokemon.json";
-  }
-  return "gen8-sword-pokemon.json";
+  return getGameFiles(gameVersion).pokemon;
 }
 
 // ========================================
@@ -186,19 +235,20 @@ interface RawPokemonFile {
  */
 export function loadPokemonData(gameVersion?: GameVersion): Pokemon[] {
   const filename = getPokemonJsonFilename(gameVersion);
-  const cacheKey = filename;
 
-  if (pokemonCache && pokemonCacheVersion === cacheKey) return pokemonCache;
+  const cached = cGet<Pokemon[]>("pokemon");
+  if (cached && cGet<string>("pokemonVersion") === filename) return cached;
 
   const raw = loadRawPokemonFile(gameVersion);
 
   // name_en -> id 캐시 구축 (loadEncounters에서 재사용)
-  pokemonNameEnToIdCache = new Map();
+  const nameEnToId = new Map<string, number>();
   for (const p of raw.pokemon) {
-    if (p.name_en) pokemonNameEnToIdCache.set(p.name_en.toLowerCase(), p.id);
+    if (p.name_en) nameEnToId.set(p.name_en.toLowerCase(), p.id);
   }
+  cSet("pokemonNameEnToId", nameEnToId);
 
-  pokemonCache = raw.pokemon.map((p) => {
+  const result = raw.pokemon.map((p) => {
     const types = p.types.map(convertTypeToKo);
     const stats: BaseStats = p.stats;
     const expGroup = p.exp_group as ExpGroup;
@@ -230,20 +280,19 @@ export function loadPokemonData(gameVersion?: GameVersion): Pokemon[] {
     return pokemon;
   });
 
-  pokemonCacheVersion = cacheKey;
-  return pokemonCache;
+  cSet("pokemon", result);
+  cSet("pokemonVersion", filename);
+  return result;
 }
-
-/** 원시 포켓몬 데이터 캐시 (loadPokemonData / loadMovesData 공유) */
-let rawPokemonCache: RawPokemonFile | null = null;
-let rawPokemonCacheVersion: string | null = null;
 
 function loadRawPokemonFile(gameVersion?: GameVersion): RawPokemonFile {
   const filename = getPokemonJsonFilename(gameVersion);
-  if (rawPokemonCache && rawPokemonCacheVersion === filename) return rawPokemonCache;
-  rawPokemonCache = readJsonFile<RawPokemonFile>("pokemon", filename);
-  rawPokemonCacheVersion = filename;
-  return rawPokemonCache;
+  const cached = cGet<RawPokemonFile>("rawPokemon");
+  if (cached && cGet<string>("rawPokemonVersion") === filename) return cached;
+  const result = readJsonFile<RawPokemonFile>("pokemon", filename);
+  cSet("rawPokemon", result);
+  cSet("rawPokemonVersion", filename);
+  return result;
 }
 
 /**
@@ -253,13 +302,13 @@ function loadRawPokemonFile(gameVersion?: GameVersion): RawPokemonFile {
  */
 export function loadMovesData(gameVersion?: GameVersion): Map<number, Move[]> {
   const filename = getPokemonJsonFilename(gameVersion);
-  const cacheKey = filename;
 
-  if (movesCache && movesCacheVersion === cacheKey) return movesCache;
+  const cached = cGet<Map<number, Move[]>>("moves");
+  if (cached && cGet<string>("movesVersion") === filename) return cached;
 
   const raw = loadRawPokemonFile(gameVersion);
 
-  movesCache = new Map();
+  const result = new Map<number, Move[]>();
 
   for (const p of raw.pokemon) {
     const moves: Move[] = p.moves
@@ -273,11 +322,12 @@ export function loadMovesData(gameVersion?: GameVersion): Map<number, Move[]> {
         learnLevel: m.learn_level,
         pokemonId: p.id,
       }));
-    movesCache.set(p.id, moves);
+    result.set(p.id, moves);
   }
 
-  movesCacheVersion = cacheKey;
-  return movesCache;
+  cSet("moves", result);
+  cSet("movesVersion", filename);
+  return result;
 }
 
 /**
@@ -412,24 +462,29 @@ function createGenericStoryPoint(sp: RawStoryPoint): StoryPoint {
   };
 }
 
-/** 원시 스토리 데이터 캐시 (loadStoryData / getAvailablePokemonIds 공유) */
-let rawStoryCache: RawStoryFile | null = null;
-
-function loadRawStoryFile(): RawStoryFile {
-  if (rawStoryCache) return rawStoryCache;
-  rawStoryCache = readJsonFile<RawStoryFile>("story", "gen8-sword-story.json");
-  return rawStoryCache;
+function loadRawStoryFile(gameId?: string): RawStoryFile {
+  const files = getGameFiles(gameId);
+  const cacheKey = files.story;
+  const cached = cGet<RawStoryFile>("rawStory");
+  if (cached && cGet<string>("rawStoryVersion") === cacheKey) return cached;
+  const result = readJsonFile<RawStoryFile>("story", files.story);
+  cSet("rawStory", result);
+  cSet("rawStoryVersion", cacheKey);
+  return result;
 }
 
 /**
  * 스토리 포인트 데이터 로드
  * story-order + gyms 데이터를 합쳐 StoryPoint[] 생성
+ * @param gameId - 게임 ID (없으면 기본값 'gen8-sword')
  */
-export function loadStoryData(): StoryPoint[] {
-  if (storyPointsCache) return storyPointsCache;
+export function loadStoryData(gameId?: string): StoryPoint[] {
+  const cached = cGet<StoryPoint[]>("storyPoints");
+  if (cached) return cached;
 
-  const storyRaw = loadRawStoryFile();
-  const gymRaw = readJsonFile<RawStoryGymFile>("story", "gen8-sword-gyms.json");
+  const files = getGameFiles(gameId);
+  const storyRaw = loadRawStoryFile(gameId);
+  const gymRaw = readJsonFile<RawStoryGymFile>("story", files.gyms);
   const gymByOrder = buildGymByOrderMap(gymRaw);
 
   const storyPoints: StoryPoint[] = [];
@@ -444,8 +499,8 @@ export function loadStoryData(): StoryPoint[] {
     storyPoints.push(createGenericStoryPoint(sp));
   }
 
-  storyPointsCache = storyPoints;
-  return storyPointsCache;
+  cSet("storyPoints", storyPoints);
+  return storyPoints;
 }
 
 // ========================================
@@ -543,15 +598,18 @@ function normalizeEncounterName(nameEn: string): string {
  * encounters JSON에서 로드하여 Encounter[] 형태로 변환
  * 주의: 출현 데이터의 name_en으로는 pokemonId를 직접 매핑할 수 없으므로,
  *       포켓몬 데이터의 name_en과 매칭하여 ID를 찾음
+ * @param gameId - 게임 ID (없으면 기본값 'gen8-sword')
  */
-export function loadEncounters(): Encounter[] {
-  if (encountersCache) return encountersCache;
+export function loadEncounters(gameId?: string): Encounter[] {
+  const cachedEnc = cGet<Encounter[]>("encounters");
+  if (cachedEnc) return cachedEnc;
 
-  const raw = readJsonFile<RawEncounterFile>("encounter", "gen8-sword-encounters.json");
+  const files = getGameFiles(gameId);
+  const raw = readJsonFile<RawEncounterFile>("encounter", files.encounters);
   loadPokemonData(); // 캐시 보장
 
   // loadPokemonData에서 구축된 name_en -> id 캐시 재사용 (중복 파싱 방지)
-  const nameToId = pokemonNameEnToIdCache ?? new Map<string, number>();
+  const nameToId = cGet<Map<string, number>>("pokemonNameEnToId") ?? new Map<string, number>();
 
   const encounters: Encounter[] = [];
 
@@ -595,42 +653,11 @@ export function loadEncounters(): Encounter[] {
     }
   }
 
-  encountersCache = encounters;
-  return encountersCache;
+  cSet("encounters", encounters);
+  return encounters;
 }
 
-// ========================================
-// 체육관 데이터
-// ========================================
 
-/**
- * 체육관 데이터 로드
- */
-function loadGyms(): Gym[] {
-  if (gymsCache) return gymsCache;
-
-  const raw = readJsonFile<RawStoryGymFile>("story", "gen8-sword-gyms.json");
-  const entries = raw.battles ?? raw.gyms ?? [];
-
-  // pokemon_id가 없는 경우를 위한 name_en → id 폴백 매핑
-  loadPokemonData(); // pokemonNameEnToIdCache 구축 보장
-  const fallbackNameToId = pokemonNameEnToIdCache ?? new Map<string, number>();
-
-  gymsCache = entries.map((g) => ({
-    id: `gym-${g.order}-${g.location}`,
-    name: `${g.leader_ko ?? g.leader} 체육관`,
-    type: convertTypeToKo(g.type),
-    leader: g.leader_ko ?? g.leader,
-    pokemon: g.pokemon
-      .map((p) => ({
-        id: p.pokemon_id ?? fallbackNameToId.get(p.name_en.toLowerCase()) ?? 0,
-        level: p.level,
-      }))
-      .filter((p) => p.id !== 0),
-  }));
-
-  return gymsCache;
-}
 
 // ========================================
 // 타입 상성표
@@ -647,7 +674,8 @@ interface RawTypeChartFile {
  * 영어 키를 한국어로 변환하여 TypeChart 형태로 반환
  */
 export function loadTypeChart(): TypeChart {
-  if (typeChartCache) return typeChartCache;
+  const cached = cGet<TypeChart>("typeChart");
+  if (cached) return cached;
 
   const raw = readJsonFile<RawTypeChartFile>("battle", "type-chart.json");
 
@@ -662,8 +690,9 @@ export function loadTypeChart(): TypeChart {
     }
   }
 
-  typeChartCache = chart as TypeChart;
-  return typeChartCache;
+  const result = chart as TypeChart;
+  cSet("typeChart", result);
+  return result;
 }
 
 // ========================================
@@ -710,16 +739,15 @@ export function getAvailablePokemonIds(storyPointOrder: number): Set<number> {
   return availableIds;
 }
 
-/** pokemonId → Pokemon Map 캐시 (#24 최적화) */
-let pokemonByIdCache: Map<number, Pokemon> | null = null;
-
 function buildPokemonIdMap(allPokemon: Pokemon[]): Map<number, Pokemon> {
-  if (pokemonByIdCache) return pokemonByIdCache;
-  pokemonByIdCache = new Map();
+  const cached = cGet<Map<number, Pokemon>>("pokemonById");
+  if (cached) return cached;
+  const result = new Map<number, Pokemon>();
   for (const p of allPokemon) {
-    pokemonByIdCache.set(p.id, p);
+    result.set(p.id, p);
   }
-  return pokemonByIdCache;
+  cSet("pokemonById", result);
+  return result;
 }
 
 /**
@@ -735,19 +763,6 @@ export function getPokemonById(id: number): Pokemon | undefined {
  * 캐시 초기화 (테스트용)
  */
 export function clearCache(): void {
-  pokemonCache = null;
-  pokemonCacheVersion = null;
-  pokemonNameEnToIdCache = null;
-  movesCache = null;
-  movesCacheVersion = null;
-  storyPointsCache = null;
-  encountersCache = null;
-  gymsCache = null;
-  typeChartCache = null;
-  pokemonByIdCache = null;
+  dataCache.clear();
   availablePokemonIdsCache.clear();
-  rawPokemonCache = null;
-  rawPokemonCacheVersion = null;
-  rawStoryCache = null;
-  abilityScoresCache = null;
 }

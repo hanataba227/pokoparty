@@ -3,16 +3,18 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Trash2, BarChart3 } from 'lucide-react';
-import type { SavedParty } from '@/types/pokemon';
+import type { SavedParty, GradeInfo } from '@/types/pokemon';
 import { getSpriteUrl } from '@/lib/sprite';
 import { UI } from '@/lib/ui-tokens';
+import { getGradeColor, getGradeBgColor } from '@/lib/party-grade';
 
 interface SavedPartyCardProps {
   party: SavedParty;
+  gradeInfo?: GradeInfo | null;
   onDelete: (id: string) => Promise<void>;
 }
 
-export default function SavedPartyCard({ party, onDelete }: SavedPartyCardProps) {
+export default function SavedPartyCard({ party, gradeInfo, onDelete }: SavedPartyCardProps) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -40,7 +42,15 @@ export default function SavedPartyCard({ party, onDelete }: SavedPartyCardProps)
 
   return (
     <div className={`${UI.pageBg} ${UI.border} p-4 shadow-sm hover:shadow-md transition-shadow`}>
-      <h3 className="font-semibold text-slate-800 mb-3 truncate">{party.name}</h3>
+      <div className="flex items-start justify-between mb-3">
+        <h3 className="font-semibold text-slate-800 truncate flex-1 mr-2">{party.name}</h3>
+        {gradeInfo && (
+          <div className={`${getGradeBgColor(gradeInfo.grade)} ${getGradeColor(gradeInfo.grade)} px-2 py-1 rounded-lg text-center flex-shrink-0`}>
+            <div className="text-lg font-bold leading-none">{gradeInfo.grade}</div>
+            <div className="text-[10px] opacity-75">{gradeInfo.totalScore}점</div>
+          </div>
+        )}
+      </div>
 
       {/* Pokemon Sprites 3x2 Grid */}
       <div className="grid grid-cols-3 gap-1 mb-3">
@@ -68,11 +78,11 @@ export default function SavedPartyCard({ party, onDelete }: SavedPartyCardProps)
         ))}
       </div>
 
-      {/* Game/Story info */}
-      {(party.game_id || party.story_point_id) && (
-        <p className="text-xs text-slate-500 mb-1">
-          {[party.game_id === 'sword-shield' ? '소드/실드' : party.game_id, party.story_point_id].filter(Boolean).join(' · ')}
-        </p>
+      {/* Game info */}
+      {party.game_id && (
+        <span className="inline-block text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full mb-1">
+          {party.game_id === 'sword-shield' ? '소드/실드' : party.game_id}
+        </span>
       )}
 
       <p className="text-xs text-slate-400 mb-3">{dateStr}</p>

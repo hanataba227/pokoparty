@@ -6,11 +6,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import ProfileSection from '@/components/ProfileSection';
 import SavedPartyList from '@/components/SavedPartyList';
 import EmptyState from '@/components/EmptyState';
-import type { SavedParty } from '@/types/pokemon';
+import type { SavedPartyWithGrade } from '@/components/SavedPartyList';
 import { UI } from '@/lib/ui-tokens';
+import { getClientErrorMessage } from '@/lib/error-utils';
 
 interface PartiesResponse {
-  parties: SavedParty[];
+  parties: SavedPartyWithGrade[];
   total: number;
   page: number;
   limit: number;
@@ -38,7 +39,7 @@ function SkeletonCards() {
 export default function MyPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [parties, setParties] = useState<SavedParty[]>([]);
+  const [parties, setParties] = useState<SavedPartyWithGrade[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [loadingParties, setLoadingParties] = useState(true);
@@ -61,7 +62,7 @@ export default function MyPage() {
       setTotalCount(json.total);
       setCurrentPage(json.page);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');
+      setError(getClientErrorMessage(err, '알 수 없는 오류가 발생했습니다.'));
     } finally {
       setLoadingParties(false);
     }

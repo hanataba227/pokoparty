@@ -27,7 +27,7 @@ function NavCell({ entry, isCurrent }: { entry: NavEntry | null; isCurrent?: boo
         width={isCurrent ? 40 : 32}
         height={isCurrent ? 40 : 32}
         className={`${isCurrent ? 'w-10 h-10' : 'w-8 h-8'} object-contain`}
-        unoptimized
+
       />
       <span className={`tabular-nums text-xs ${isCurrent ? 'text-slate-900' : 'text-slate-400'}`}>
         #{String(entry.id).padStart(4, '0')}

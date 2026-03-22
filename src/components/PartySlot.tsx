@@ -72,7 +72,7 @@ export default function PartySlot({ pokemon, slotNumber, onRemove, onAdd }: Part
         width={48}
         height={48}
         className="w-12 h-12 object-contain"
-        unoptimized
+
       />
 
       {/* 이름 */}

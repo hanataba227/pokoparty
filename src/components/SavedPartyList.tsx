@@ -2,10 +2,13 @@
 
 import SavedPartyCard from '@/components/SavedPartyCard';
 import EmptyState from '@/components/EmptyState';
-import type { SavedParty } from '@/types/pokemon';
+import type { SavedParty, GradeInfo } from '@/types/pokemon';
+
+/** API 응답에서 gradeInfo가 포함된 파티 */
+export type SavedPartyWithGrade = SavedParty & { gradeInfo?: GradeInfo | null };
 
 interface SavedPartyListProps {
-  parties: SavedParty[];
+  parties: SavedPartyWithGrade[];
   totalCount: number;
   currentPage: number;
   onPageChange: (page: number) => void;
@@ -38,7 +41,7 @@ export default function SavedPartyList({
       {/* Party Grid - responsive 1/2/3 columns */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {parties.map((party) => (
-          <SavedPartyCard key={party.id} party={party} onDelete={onDelete} />
+          <SavedPartyCard key={party.id} party={party} gradeInfo={party.gradeInfo} onDelete={onDelete} />
         ))}
       </div>
 

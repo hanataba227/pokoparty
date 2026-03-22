@@ -250,6 +250,24 @@ export interface PartyRecommendation {
   detailedReasons?: DetailedReason[];
 }
 
+/** 파티 등급 */
+export type PartyGrade = 'S' | 'A' | 'B' | 'C' | 'D';
+
+/** 등급 세부 점수 (3축) */
+export interface GradeBreakdown {
+  offense: number;   // 공격 커버리지 점수 (0~100)
+  defense: number;   // 방어 밸런스 점수 (0~100)
+  diversity: number; // 타입 다양성 점수 (0~100)
+}
+
+/** 등급 정보 */
+export interface GradeInfo {
+  grade: PartyGrade;
+  totalScore: number;
+  breakdown: GradeBreakdown;
+  suggestions: string[];
+}
+
 /** 타입 분석 결과 */
 export interface AnalysisResult {
   /** 타입 커버리지: 공격 시 효과적인 타입 목록 */
@@ -262,6 +280,8 @@ export interface AnalysisResult {
   coverageScore: number;
   /** 약점/내성 상세 (각 타입에 대한 배율) */
   typeMatchups: Record<PokemonType, number>;
+  /** 등급 정보 (optional, 하위호환) */
+  gradeInfo?: GradeInfo;
 }
 
 /** 스코어링 세부 점수 (optimized-weights.json 칼럼과 1:1 매핑) */

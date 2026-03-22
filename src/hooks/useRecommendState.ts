@@ -1,20 +1,26 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { Pokemon, ScoringBreakdown, PokemonType, DetailedReason } from '@/types/pokemon';
 import { ALL_TYPES } from '@/lib/type-calc';
 import { useAuth } from '@/contexts/AuthContext';
 import { cachedFetch } from '@/lib/client-cache';
+import { getClientErrorMessage } from '@/lib/error-utils';
 
-const GAME_TITLES = [
-  { id: 'gen8-swsh-sword', label: '소드', gameId: 'gen8-swsh', icon: '🗡️' },
-  { id: 'gen8-swsh-shield', label: '실드', gameId: 'gen8-swsh', icon: '🛡️' },
-  { id: 'gen8-pla', label: '레전드 아르세우스', gameId: 'gen8-pla', icon: '⭐', disabled: true },
-  { id: 'gen9-sv-scarlet', label: '스칼렛', gameId: 'gen9-sv', icon: '🔴', disabled: true },
-  { id: 'gen9-sv-violet', label: '바이올렛', gameId: 'gen9-sv', icon: '🟣', disabled: true },
-];
+import { getGameById } from '@/lib/game-data';
 
-export { GAME_TITLES };
+/** 게임 ID → API gameVersion 매핑 (#42) */
+const GAME_VERSION_MAP: Record<string, string> = {
+  'sword': 'sword',
+  'shield': 'shield',
+  'legends-arceus': 'legends-arceus',
+  'scarlet': 'scarlet',
+  'violet': 'violet',
+  'scarlet-tm': 'scarlet',
+  'violet-tm': 'violet',
+  'scarlet-id': 'scarlet',
+  'violet-id': 'violet',
+};
 
 export interface RecommendationItem {
   pokemon: Pokemon;
@@ -28,12 +34,12 @@ export interface RecommendationItem {
 /** Step 1: 게임 선택 상태 */
 function useGameSelection() {
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
+  const [includeDlc, setIncludeDlc] = useState(false);
 
-  const gameVersion = selectedGameId === 'gen8-swsh-sword' ? 'sword'
-    : selectedGameId === 'gen8-swsh-shield' ? 'shield'
-    : null;
+  // game-data.ts의 ID를 data-loader가 기대하는 gameVersion으로 매핑
+  const gameVersion = selectedGameId ? (GAME_VERSION_MAP[selectedGameId] ?? null) : null;
 
-  return { selectedGameId, setSelectedGameId, gameVersion };
+  return { selectedGameId, setSelectedGameId, gameVersion, includeDlc, setIncludeDlc };
 }
 
 /** Step 2: 고정 포켓몬 상태 */
@@ -114,7 +120,7 @@ function usePokemonLoader(currentStep: number, selectedGameId: string | null, ga
         setAllPokemon(data.pokemon);
       } catch (err) {
         setPokemonError(
-          err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.'
+          getClientErrorMessage(err, '알 수 없는 오류가 발생했습니다.')
         );
       } finally {
         setPokemonLoading(false);
@@ -200,7 +206,7 @@ function useRecommendations(
       setRecommendations(data.recommendations || []);
     } catch (err) {
       setRecommendError(
-        err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.'
+        getClientErrorMessage(err, '알 수 없는 오류가 발생했습니다.')
       );
     } finally {
       setRecommendLoading(false);
@@ -228,8 +234,10 @@ function usePartySave(
     ];
     if (allPokemonIds.length === 0) return;
 
-    const gameEntry = GAME_TITLES.find((g) => g.id === selectedGameId);
-    const gameId = gameEntry?.gameId === 'gen8-swsh' ? 'sword-shield' : gameEntry?.gameId || '';
+    const gameEntry = getGameById(selectedGameId ?? '');
+    const gameId = selectedGameId === 'sword' || selectedGameId === 'shield'
+      ? 'sword-shield'
+      : selectedGameId || '';
 
     try {
       setSaving(true);
@@ -240,7 +248,7 @@ function usePartySave(
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: `${gameEntry?.label || '파티'} 추천 파티`,
+          name: `${gameEntry?.label ?? '파티'} 추천 파티`,
           pokemon_ids: allPokemonIds,
           story_point_id: null,
           game_id: gameId,
@@ -254,7 +262,7 @@ function usePartySave(
 
       setSaveSuccess(true);
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : '알 수 없는 오류');
+      setSaveError(getClientErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -297,13 +305,15 @@ export function useRecommendState() {
     },
   );
 
-  // Step 진행 시 추천 요청
+  // Step 진행 시 추천 요청 — ref 패턴으로 eslint-disable 제거 (#10)
+  const fetchRecommendationsRef = useRef(recommendState.fetchRecommendations);
+  fetchRecommendationsRef.current = recommendState.fetchRecommendations;
+
   useEffect(() => {
     if (currentStep === 3) {
-      recommendState.fetchRecommendations();
+      fetchRecommendationsRef.current();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentStep, recommendState.fetchRecommendations]);
+  }, [currentStep]);
 
   // 파티 저장
   const partySave = usePartySave(

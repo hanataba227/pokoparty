@@ -6,15 +6,11 @@
  * Response: { analysis: AnalysisResult }
  */
 import { NextRequest, NextResponse } from "next/server";
-import type { AnalysisResult, PokemonType } from "@/types/pokemon";
+import type { AnalysisResult } from "@/types/pokemon";
 import { loadPokemonData, loadTypeChart } from "@/lib/data-loader";
 import { getApiErrorMessage } from "@/lib/api-error";
-import {
-  ALL_TYPES,
-  calculateOffensiveCoverage,
-  getDefensiveMatchups,
-} from "@/lib/type-calc";
 import { withRateLimit } from "@/lib/rate-limit";
+import { analyzeParty } from "@/lib/party-analysis";
 
 export const POST = withRateLimit(async (request: NextRequest) => {
   try {
@@ -72,51 +68,7 @@ export const POST = withRateLimit(async (request: NextRequest) => {
 
     // 타입 분석
     const partyTypes = party.map((p) => p.types);
-    const partyAttackTypes = party.map((p) => p.types); // 기본 공격 타입 = 포켓몬 타입
-
-    // 공격 커버리지
-    const coverage = calculateOffensiveCoverage(partyAttackTypes, typeChart);
-
-    // 방어 분석 (파티 전체)
-    // 각 멤버의 방어 배율을 한 번만 계산
-    const memberMatchups = partyTypes.map((types) => getDefensiveMatchups(types, typeChart));
-
-    // 각 타입에 대한 최적 방어 배율
-    const typeMatchups: Partial<Record<PokemonType, number>> = {};
-    const weaknesses: PokemonType[] = [];
-    const resistances: PokemonType[] = [];
-
-    for (const atkType of ALL_TYPES) {
-      let bestDefense = Infinity;
-      let weakCount = 0;
-      let resistCount = 0;
-
-      for (const matchups of memberMatchups) {
-        const mult = matchups[atkType];
-        bestDefense = Math.min(bestDefense, mult);
-        if (mult > 1) weakCount++;
-        if (mult < 1) resistCount++;
-      }
-
-      typeMatchups[atkType] = bestDefense;
-      if (weakCount > party.length / 2) {
-        weaknesses.push(atkType);
-      }
-      if (resistCount > party.length / 2) {
-        resistances.push(atkType);
-      }
-    }
-
-    // 커버리지 점수 (18타입 중 몇 타입을 효과적으로 공격 가능한지)
-    const coverageScore = Math.round((coverage.length / ALL_TYPES.length) * 100);
-
-    const analysis: AnalysisResult = {
-      coverage,
-      weaknesses,
-      resistances,
-      coverageScore,
-      typeMatchups: typeMatchups as Record<PokemonType, number>,
-    };
+    const analysis: AnalysisResult = analyzeParty(partyTypes, typeChart);
 
     return NextResponse.json({ analysis });
   } catch (error) {

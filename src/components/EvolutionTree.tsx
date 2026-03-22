@@ -106,7 +106,7 @@ export default function EvolutionTree({
                     width={64}
                     height={64}
                     className="w-full h-full object-contain"
-                    unoptimized
+
                   />
                 </div>
                 <span className="text-xs font-medium text-slate-900 mt-1">

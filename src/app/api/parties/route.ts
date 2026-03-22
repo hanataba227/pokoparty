@@ -7,12 +7,33 @@ import { createServerSupabase } from "@/lib/supabase-server";
 import { requireAuth } from "@/lib/auth-guard";
 import { getApiErrorMessage } from "@/lib/api-error";
 import { withRateLimit } from "@/lib/rate-limit";
+import { loadPokemonData, loadTypeChart } from "@/lib/data-loader";
+import { analyzeParty } from "@/lib/party-analysis";
 
 /** 유저당 최대 저장 파티 수 */
 const MAX_PARTIES = 30;
 
-/** 허용되는 game_id 목록 */
-const VALID_GAME_IDS = ["sword-shield"];
+/** 허용되는 game_id 목록 — GAME_TITLES의 gameId 변환 결과와 일치해야 함 */
+const VALID_GAME_IDS = [
+  "sword-shield",
+  "gen8-pla",
+  "gen9-sv",
+  "gen1-rgby",
+  "gen1-frlg",
+  "gen1-lpe",
+  "gen2-gsc",
+  "gen2-hgss",
+  "gen3-rse",
+  "gen3-oras",
+  "gen4-dppt",
+  "gen4-bdsp",
+  "gen5-bw",
+  "gen5-b2w2",
+  "gen6-xy",
+  "gen7-sm",
+  "gen7-usum",
+  "gen8-swsh",
+];
 
 export const GET = withRateLimit(async (request: NextRequest) => {
   try {
@@ -30,16 +51,10 @@ export const GET = withRateLimit(async (request: NextRequest) => {
     );
     const offset = (page - 1) * limit;
 
-    // 전체 개수 조회
-    const { count } = await supabase
+    // 파티 목록 + 전체 개수를 단일 쿼리로 조회 (최신순)
+    const { data: parties, count, error: fetchError } = await supabase
       .from("saved_parties")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", user.id);
-
-    // 파티 목록 조회 (최신순)
-    const { data: parties, error: fetchError } = await supabase
-      .from("saved_parties")
-      .select("*")
+      .select("*", { count: "exact" })
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
@@ -52,8 +67,35 @@ export const GET = withRateLimit(async (request: NextRequest) => {
       );
     }
 
+    // TODO: 등급 사전 저장 denormalization 검토 — 현재 매 요청마다 타입 계산 + 등급 산출 반복
+    // 데이터 로드 (루프 밖에서 한 번만)
+    const allPokemon = loadPokemonData();
+    const typeChart = loadTypeChart();
+    const pokemonMap = new Map(allPokemon.map((p) => [p.id, p]));
+
+    // 각 파티에 gradeInfo 계산
+    const partiesWithGrade = (parties ?? []).map((party) => {
+      try {
+        const pokemonIds: number[] = party.pokemon_ids;
+        const partyPokemon = pokemonIds
+          .map((id) => pokemonMap.get(id))
+          .filter((p) => p !== undefined);
+
+        if (partyPokemon.length === 0) {
+          return { ...party, gradeInfo: null };
+        }
+
+        const partyTypes = partyPokemon.map((p) => p.types);
+        const { gradeInfo } = analyzeParty(partyTypes, typeChart);
+
+        return { ...party, gradeInfo };
+      } catch {
+        return { ...party, gradeInfo: null };
+      }
+    });
+
     return NextResponse.json({
-      parties: parties ?? [],
+      parties: partiesWithGrade,
       total: count ?? 0,
       page,
       limit,
@@ -96,7 +138,7 @@ export const POST = withRateLimit(async (request: NextRequest) => {
       );
     }
 
-    // pokemon_ids 검증: 정수 배열, 1~6개, 각 1~898, 중복 불허
+    // pokemon_ids 검증: 정수 배열, 1~6개, 각 1~1025, 중복 불허
     if (!Array.isArray(pokemon_ids)) {
       return NextResponse.json(
         { error: "포켓몬 목록이 올바르지 않습니다." },
@@ -110,7 +152,7 @@ export const POST = withRateLimit(async (request: NextRequest) => {
       );
     }
     for (const id of pokemon_ids) {
-      if (!Number.isInteger(id) || id < 1 || id > 898) {
+      if (!Number.isInteger(id) || id < 1 || id > 1025) {
         return NextResponse.json(
           { error: "올바르지 않은 포켓몬 ID가 포함되어 있습니다." },
           { status: 400 },

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { UI } from '@/lib/ui-tokens';
@@ -30,6 +30,7 @@ const GEN_LABELS = [
   { gen: 6, label: '6세대', range: '칼로스', title: 'X·Y' },
   { gen: 7, label: '7세대', range: '알로라', title: '썬·문' },
   { gen: 8, label: '8세대', range: '가라르', title: '소드·실드' },
+  { gen: 9, label: '9세대', range: '팔데아', title: '스칼렛·바이올렛' },
 ];
 
 function PokemonCard({ p }: { p: PokedexEntry }) {
@@ -44,7 +45,7 @@ function PokemonCard({ p }: { p: PokedexEntry }) {
         width={64}
         height={64}
         className="w-16 h-16 object-contain"
-        unoptimized
+
       />
       <span className="text-xs text-slate-400 mt-1">
         #{String(p.id).padStart(3, '0')}
@@ -66,10 +67,17 @@ export default function PokedexList({ pokemon, defaultPopularIds }: PokedexListP
   const [popularIds, setPopularIds] = useState<number[]>(defaultPopularIds);
   const searchRef = useRef<HTMLDivElement>(null);
 
+  const pokemonMap = useMemo(() => {
+    const map = new Map<number, PokedexEntry>();
+    for (const p of pokemon) map.set(p.id, p);
+    return map;
+  }, [pokemon]);
+
   // 마운트 시 인기 포켓몬 API 호출 (캐시 적용)
   useEffect(() => {
     cachedFetch('popular-pokemon', async () => {
       const res = await fetch('/api/popular-pokemon?limit=8');
+      if (!res.ok) throw new Error(`인기 포켓몬 API 오류: ${res.status}`);
       return res.json();
     })
       .then((data) => {
@@ -94,7 +102,7 @@ export default function PokedexList({ pokemon, defaultPopularIds }: PokedexListP
 
   // 인기 포켓몬
   const popularPokemon = popularIds
-    .map((id) => pokemon.find((p) => p.id === id))
+    .map((id) => pokemonMap.get(id))
     .filter(Boolean) as PokedexEntry[];
 
   // 세대별 포켓몬
@@ -165,7 +173,7 @@ export default function PokedexList({ pokemon, defaultPopularIds }: PokedexListP
                   width={36}
                   height={36}
                   className="w-9 h-9 object-contain"
-                  unoptimized
+          
                 />
                 <span className="text-sm text-slate-400 tabular-nums w-12">
                   #{String(p.id).padStart(3, '0')}

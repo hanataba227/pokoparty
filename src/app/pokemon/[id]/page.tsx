@@ -95,7 +95,7 @@ export default async function PokemonDetailPage({ params }: { params: Promise<{ 
                     width={96}
                     height={96}
                     className="w-full h-full object-contain"
-                    unoptimized
+
                   />
                 </div>
                 <h1 className="text-2xl font-bold text-slate-900">{pokemon.name}</h1>
