@@ -9,19 +9,6 @@ import { getClientErrorMessage } from '@/lib/error-utils';
 
 import { getGameById } from '@/lib/game-data';
 
-/** 게임 ID → API gameVersion 매핑 (#42) */
-const GAME_VERSION_MAP: Record<string, string> = {
-  'sword': 'sword',
-  'shield': 'shield',
-  'legends-arceus': 'legends-arceus',
-  'scarlet': 'scarlet',
-  'violet': 'violet',
-  'scarlet-tm': 'scarlet',
-  'violet-tm': 'violet',
-  'scarlet-id': 'scarlet',
-  'violet-id': 'violet',
-};
-
 export interface RecommendationItem {
   pokemon: Pokemon;
   score: number;
@@ -36,8 +23,9 @@ function useGameSelection() {
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [includeDlc, setIncludeDlc] = useState(false);
 
-  // game-data.ts의 ID를 data-loader가 기대하는 gameVersion으로 매핑
-  const gameVersion = selectedGameId ? (GAME_VERSION_MAP[selectedGameId] ?? null) : null;
+  // game-data.ts에 등록된 게임 ID를 그대로 gameVersion으로 사용
+  // getGameById로 유효성 검증하여 미등록 ID는 null 처리
+  const gameVersion = selectedGameId && getGameById(selectedGameId) ? selectedGameId : null;
 
   return { selectedGameId, setSelectedGameId, gameVersion, includeDlc, setIncludeDlc };
 }

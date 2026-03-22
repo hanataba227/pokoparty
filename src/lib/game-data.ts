@@ -26,6 +26,8 @@ export interface GameEntry {
   storyGroup: string | null;
   /** 리메이크/파생 여부 */
   isRemake: boolean;
+  /** UI에서 숨길지 여부 */
+  hidden?: boolean;
 }
 
 export interface GenerationGroup {
@@ -133,8 +135,8 @@ const ALL_GAMES: GameEntry[] = [
   { id: 'yellow', label: '피카츄', icon: '⚡', generation: 1, region: 'kanto', isDlc: false, encounterFile: 'gen1-yellow-encounters.json', storyGroup: 'yellow', isRemake: false },
   { id: 'firered', label: '파이어레드', icon: '🔥', generation: 1, region: 'kanto', isDlc: false, encounterFile: 'gen1-firered-encounters.json', storyGroup: 'firered-leafgreen', isRemake: true },
   { id: 'leafgreen', label: '리프그린', icon: '🍃', generation: 1, region: 'kanto', isDlc: false, encounterFile: 'gen1-leafgreen-encounters.json', storyGroup: 'firered-leafgreen', isRemake: true },
-  { id: 'lgp', label: "Let's Go 피카츄", icon: '⚡', generation: 1, region: 'kanto', isDlc: false, encounterFile: 'gen1-lgp-encounters.json', storyGroup: 'lgp-lge', isRemake: true },
-  { id: 'lge', label: "Let's Go 이브이", icon: '🤎', generation: 1, region: 'kanto', isDlc: false, encounterFile: 'gen1-lge-encounters.json', storyGroup: 'lgp-lge', isRemake: true },
+  { id: 'lgp', label: "Let's Go 피카츄", icon: '⚡', generation: 1, region: 'kanto', isDlc: false, encounterFile: 'gen1-lgp-encounters.json', storyGroup: 'lgp-lge', isRemake: true, hidden: true },
+  { id: 'lge', label: "Let's Go 이브이", icon: '🤎', generation: 1, region: 'kanto', isDlc: false, encounterFile: 'gen1-lge-encounters.json', storyGroup: 'lgp-lge', isRemake: true, hidden: true },
 
   // === Gen 2: 성도 ===
   { id: 'gold', label: '골드', icon: '🥇', generation: 2, region: 'johto', isDlc: false, encounterFile: 'gen2-gold-encounters.json', storyGroup: 'gold-silver', isRemake: false },
@@ -156,7 +158,7 @@ const ALL_GAMES: GameEntry[] = [
   { id: 'platinum', label: '플라티나', icon: '⬜', generation: 4, region: 'sinnoh', isDlc: false, encounterFile: 'gen4-platinum-encounters.json', storyGroup: 'platinum', isRemake: false },
   { id: 'brilliantdiamond', label: '브릴리언트 다이아몬드', icon: '💎', generation: 4, region: 'sinnoh', isDlc: false, encounterFile: 'gen4-brilliantdiamond-encounters.json', storyGroup: 'brilliantdiamond-shiningpearl', isRemake: true },
   { id: 'shiningpearl', label: '샤이닝 펄', icon: '🌟', generation: 4, region: 'sinnoh', isDlc: false, encounterFile: 'gen4-shiningpearl-encounters.json', storyGroup: 'brilliantdiamond-shiningpearl', isRemake: true },
-  { id: 'legendsarceus', label: '레전드 아르세우스', icon: '⭐', generation: 4, region: 'hisui', isDlc: false, encounterFile: 'gen4-legendsarceus-encounters.json', storyGroup: 'legendsarceus', isRemake: false },
+  { id: 'legendsarceus', label: '레전드 아르세우스', icon: '⭐', generation: 4, region: 'hisui', isDlc: false, encounterFile: 'gen4-legendsarceus-encounters.json', storyGroup: 'legendsarceus', isRemake: false, hidden: true },
 
   // === Gen 5: 하나 ===
   { id: 'black', label: '블랙', icon: '⚫', generation: 5, region: 'unova', isDlc: false, encounterFile: 'gen5-black-encounters.json', storyGroup: 'black-white', isRemake: false },
@@ -167,7 +169,7 @@ const ALL_GAMES: GameEntry[] = [
   // === Gen 6: 칼로스 ===
   { id: 'x', label: 'X', icon: '🔵', generation: 6, region: 'kalos', isDlc: false, encounterFile: 'gen6-x-encounters.json', storyGroup: 'x-y', isRemake: false },
   { id: 'y', label: 'Y', icon: '🔴', generation: 6, region: 'kalos', isDlc: false, encounterFile: 'gen6-y-encounters.json', storyGroup: 'x-y', isRemake: false },
-  { id: 'legendsza', label: 'LEGENDS Z-A', icon: '✨', generation: 6, region: 'kalos', isDlc: false, encounterFile: 'gen6-legendsza-encounters.json', storyGroup: 'legendsza', isRemake: false },
+  { id: 'legendsza', label: 'LEGENDS Z-A', icon: '✨', generation: 6, region: 'kalos', isDlc: false, encounterFile: 'gen6-legendsza-encounters.json', storyGroup: 'legendsza', isRemake: false, hidden: true },
 
   // === Gen 7: 알로라 ===
   { id: 'sun', label: '썬', icon: '☀️', generation: 7, region: 'alola', isDlc: false, encounterFile: 'gen7-sun-encounters.json', storyGroup: 'sun-moon', isRemake: false },

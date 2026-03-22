@@ -154,6 +154,8 @@ export interface Encounter {
   pokemonId: number;
   /** 출현 지점 ID (FK → StoryPoint) */
   storyPointId: string;
+  /** 스토리 진행 순서 (encounter 파일의 story_order) */
+  storyOrder: number;
   /** 출현 방법 */
   method: EncounterMethod;
   /** 출현 레벨 범위 [min, max] */
@@ -207,8 +209,8 @@ export interface RecommendFilters {
   gen8Only?: boolean;
   /** 선택된 타입만 포함 */
   selectedTypes?: PokemonType[];
-  /** 게임 버전 */
-  gameVersion?: 'sword' | 'shield';
+  /** 게임 버전 (game-data.ts의 모든 게임 ID 지원) */
+  gameVersion?: string;
 }
 
 // ========================================

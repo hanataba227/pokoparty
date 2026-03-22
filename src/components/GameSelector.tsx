@@ -88,7 +88,7 @@ function GenerationCard({
   includeDlc: boolean;
 }) {
   const c = GEN_COLORS[group.generation] ?? GEN_COLORS[1];
-  const games = includeDlc ? group.games : group.games.filter((g) => !g.isDlc);
+  const games = (includeDlc ? group.games : group.games.filter((g) => !g.isDlc)).filter((g) => !g.hidden);
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">

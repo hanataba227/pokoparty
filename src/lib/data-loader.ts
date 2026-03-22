@@ -19,6 +19,7 @@ import type {
   EncounterRarity,
 } from "@/types/pokemon";
 import { classifyRoleFromStats } from "@/lib/roles";
+import { getGameById, getAllGames } from "@/lib/game-data";
 
 // ========================================
 // 영어 → 한국어 타입 매핑
@@ -167,13 +168,84 @@ interface GameFileMapping {
   encounters: string;
 }
 
-const GAME_FILE_MAP: Record<string, GameFileMapping> = {
-  // 8세대 소드/실드
-  "sword": { pokemon: "gen8-sword-pokemon.json", story: "gen8-sword-story.json", gyms: "gen8-sword-gyms.json", encounters: "gen8-sword-encounters.json" },
-  "shield": { pokemon: "gen8-shield-pokemon.json", story: "gen8-shield-story.json", gyms: "gen8-shield-gyms.json", encounters: "gen8-shield-encounters.json" },
-  "gen8-swsh-sword": { pokemon: "gen8-sword-pokemon.json", story: "gen8-sword-story.json", gyms: "gen8-sword-gyms.json", encounters: "gen8-sword-encounters.json" },
-  "gen8-swsh-shield": { pokemon: "gen8-shield-pokemon.json", story: "gen8-shield-story.json", gyms: "gen8-shield-gyms.json", encounters: "gen8-shield-encounters.json" },
+/**
+ * story group → 실제 story/gyms 파일명 접두사 매핑
+ * story 파일은 버전쌍 단위로 공유되므로 game ID와 파일명이 다름
+ */
+const STORY_FILE_PREFIX_MAP: Record<string, { story: string; gyms: string }> = {
+  // Gen 1
+  'red-green-blue':          { story: 'gen1-rgb-story.json',          gyms: 'gen1-rgb-gyms.json' },
+  'yellow':                  { story: 'gen1-yellow-story.json',       gyms: 'gen1-yellow-gyms.json' },
+  'firered-leafgreen':       { story: 'gen1-frlg-story.json',        gyms: 'gen1-frlg-gyms.json' },
+  'lgp-lge':                 { story: 'gen1-lgpe-story.json',        gyms: 'gen1-lgpe-gyms.json' },
+  // Gen 2
+  'gold-silver':             { story: 'gen2-gs-story.json',           gyms: 'gen2-gs-gyms.json' },
+  'crystal':                 { story: 'gen2-crystal-story.json',      gyms: 'gen2-crystal-gyms.json' },
+  'heartgold-soulsilver':    { story: 'gen2-hgss-story.json',        gyms: 'gen2-hgss-gyms.json' },
+  // Gen 3
+  'ruby-sapphire':           { story: 'gen3-rs-story.json',           gyms: 'gen3-rs-gyms.json' },
+  'emerald':                 { story: 'gen3-emerald-story.json',      gyms: 'gen3-emerald-gyms.json' },
+  'omegaruby-alphasapphire': { story: 'gen3-oras-story.json',        gyms: 'gen3-oras-gyms.json' },
+  // Gen 4
+  'diamond-pearl':           { story: 'gen4-dp-story.json',           gyms: 'gen4-dp-gyms.json' },
+  'platinum':                { story: 'gen4-platinum-story.json',     gyms: 'gen4-platinum-gyms.json' },
+  'brilliantdiamond-shiningpearl': { story: 'gen4-bdsp-story.json',  gyms: 'gen4-bdsp-gyms.json' },
+  'legendsarceus':           { story: 'gen4-legendsarceus-story.json', gyms: 'gen4-legendsarceus-bosses.json' },
+  // Gen 5
+  'black-white':             { story: 'gen5-bw-story.json',           gyms: 'gen5-bw-gyms.json' },
+  'black2-white2':           { story: 'gen5-b2w2-story.json',        gyms: 'gen5-b2w2-gyms.json' },
+  // Gen 6
+  'x-y':                     { story: 'gen6-xy-story.json',           gyms: 'gen6-xy-gyms.json' },
+  'legendsza':               { story: 'gen6-legendsza-story.json',   gyms: 'gen6-xy-gyms.json' },
+  // Gen 7
+  'sun-moon':                { story: 'gen7-sm-story.json',           gyms: 'gen7-sm-trials.json' },
+  'ultrasun-ultramoon':      { story: 'gen7-usum-story.json',        gyms: 'gen7-usum-trials.json' },
+  // Gen 8
+  'sword':                   { story: 'gen8-sword-story.json',        gyms: 'gen8-sword-gyms.json' },
+  'shield':                  { story: 'gen8-shield-story.json',       gyms: 'gen8-shield-gyms.json' },
+  'sword-shield-ioa':        { story: 'gen8-ioa-story.json',         gyms: 'gen8-sword-gyms.json' },
+  'sword-shield-ct':         { story: 'gen8-ct-story.json',          gyms: 'gen8-sword-gyms.json' },
+  // Gen 9
+  'scarlet-violet':          { story: 'gen9-sv-story.json',           gyms: 'gen9-sv-gyms.json' },
+  'scarlet-violet-tm':       { story: 'gen9-tm-story.json',          gyms: 'gen9-sv-gyms.json' },
+  'scarlet-violet-id':       { story: 'gen9-id-story.json',          gyms: 'gen9-sv-gyms.json' },
 };
+
+/**
+ * game-data.ts의 ALL_GAMES에서 동적으로 GAME_FILE_MAP을 생성
+ * 게임 ID + generation으로 pokemon/encounter 파일 경로를 자동 생성하고,
+ * storyGroup으로 story/gyms 파일을 매핑
+ */
+function buildGameFileMap(): Record<string, GameFileMapping> {
+  const map: Record<string, GameFileMapping> = {};
+
+  for (const game of getAllGames()) {
+    const gen = game.generation;
+    const id = game.id;
+
+    // pokemon: gen{N}-{id}-pokemon.json
+    const pokemon = `gen${gen}-${id}-pokemon.json`;
+
+    // encounters: gen{N}-{id}-encounters.json
+    const encounters = `gen${gen}-${id}-encounters.json`;
+
+    // story/gyms: storyGroup 기반 매핑
+    const storyFiles = game.storyGroup ? STORY_FILE_PREFIX_MAP[game.storyGroup] : null;
+    const story = storyFiles?.story ?? 'gen8-sword-story.json';
+    const gyms = storyFiles?.gyms ?? 'gen8-sword-gyms.json';
+
+    map[id] = { pokemon, story, gyms, encounters };
+  }
+
+  // 레거시 별명 (하위 호환)
+  map["gen8-swsh-sword"] = map["sword"];
+  map["gen8-swsh-shield"] = map["shield"];
+
+  return map;
+}
+
+/** 게임 ID → 파일 매핑 (ALL_GAMES에서 동적 생성) */
+const GAME_FILE_MAP: Record<string, GameFileMapping> = buildGameFileMap();
 
 /** gameVersion/gameId에서 파일 매핑 조회. 없으면 기본값(sword) 반환. */
 function getGameFiles(gameId?: string): GameFileMapping {
@@ -181,12 +253,12 @@ function getGameFiles(gameId?: string): GameFileMapping {
   return GAME_FILE_MAP["sword"];
 }
 
-type GameVersion = "sword" | "shield";
+/** 유효한 게임 버전 문자열 (ALL_GAMES의 모든 게임 ID) */
+type GameVersion = string;
 
 /**
  * gameVersion에 따라 적절한 포켓몬 JSON 파일명 반환
- * - sword → gen8-sword-pokemon.json
- * - shield → gen8-shield-pokemon.json
+ * game-data.ts의 모든 게임 ID를 지원
  * - undefined → gen8-sword-pokemon.json (기본값: sword)
  */
 function getPokemonJsonFilename(gameVersion?: GameVersion): string {
@@ -333,8 +405,8 @@ export function loadMovesData(gameVersion?: GameVersion): Map<number, Move[]> {
 /**
  * 특정 포켓몬의 기술 목록
  */
-export function getMovesForPokemon(pokemonId: number): Move[] {
-  const allMoves = loadMovesData();
+export function getMovesForPokemon(pokemonId: number, gameVersion?: string): Move[] {
+  const allMoves = loadMovesData(gameVersion);
   return allMoves.get(pokemonId) || [];
 }
 
@@ -479,10 +551,11 @@ function loadRawStoryFile(gameId?: string): RawStoryFile {
  * @param gameId - 게임 ID (없으면 기본값 'gen8-sword')
  */
 export function loadStoryData(gameId?: string): StoryPoint[] {
-  const cached = cGet<StoryPoint[]>("storyPoints");
-  if (cached) return cached;
-
   const files = getGameFiles(gameId);
+  const cacheKey = files.story;
+  const cached = cGet<StoryPoint[]>("storyPoints");
+  if (cached && cGet<string>("storyVersion") === cacheKey) return cached;
+
   const storyRaw = loadRawStoryFile(gameId);
   const gymRaw = readJsonFile<RawStoryGymFile>("story", files.gyms);
   const gymByOrder = buildGymByOrderMap(gymRaw);
@@ -500,6 +573,7 @@ export function loadStoryData(gameId?: string): StoryPoint[] {
   }
 
   cSet("storyPoints", storyPoints);
+  cSet("storyVersion", cacheKey);
   return storyPoints;
 }
 
@@ -519,6 +593,7 @@ interface RawLocation {
   location_id: string;
   location_name: string;
   encounter_count: number;
+  story_order?: number;
   encounters: RawEncounterEntry[];
 }
 
@@ -601,12 +676,13 @@ function normalizeEncounterName(nameEn: string): string {
  * @param gameId - 게임 ID (없으면 기본값 'gen8-sword')
  */
 export function loadEncounters(gameId?: string): Encounter[] {
-  const cachedEnc = cGet<Encounter[]>("encounters");
-  if (cachedEnc) return cachedEnc;
-
   const files = getGameFiles(gameId);
+  const cacheKey = files.encounters;
+  const cachedEnc = cGet<Encounter[]>("encounters");
+  if (cachedEnc && cGet<string>("encountersVersion") === cacheKey) return cachedEnc;
+
   const raw = readJsonFile<RawEncounterFile>("encounter", files.encounters);
-  loadPokemonData(); // 캐시 보장
+  loadPokemonData(gameId); // 캐시 보장 (해당 게임 버전의 포켓몬 데이터)
 
   // loadPokemonData에서 구축된 name_en -> id 캐시 재사용 (중복 파싱 방지)
   const nameToId = cGet<Map<string, number>>("pokemonNameEnToId") ?? new Map<string, number>();
@@ -646,6 +722,7 @@ export function loadEncounters(gameId?: string): Encounter[] {
       encounters.push({
         pokemonId,
         storyPointId,
+        storyOrder: loc.story_order ?? 0,
         method,
         levelRange: enc.level_range,
         rarity,
@@ -654,6 +731,7 @@ export function loadEncounters(gameId?: string): Encounter[] {
   }
 
   cSet("encounters", encounters);
+  cSet("encountersVersion", cacheKey);
   return encounters;
 }
 
@@ -699,43 +777,44 @@ export function loadTypeChart(): TypeChart {
 // 유틸리티 함수
 // ========================================
 
-/** storyPointOrder별 캐시 (#25 최적화) */
-const availablePokemonIdsCache = new Map<number, Set<number>>();
+/** storyPointOrder+gameId별 캐시 (#25 최적화) */
+const availablePokemonIdsCache = new Map<string, Set<number>>();
 
 /**
  * 특정 스토리 포인트까지 잡을 수 있는 포켓몬 ID 목록
  */
-export function getAvailablePokemonIds(storyPointOrder: number): Set<number> {
-  const cached = availablePokemonIdsCache.get(storyPointOrder);
+export function getAvailablePokemonIds(storyPointOrder: number, gameId?: string): Set<number> {
+  const cacheKey = `${storyPointOrder}:${gameId ?? "sword"}`;
+  const cached = availablePokemonIdsCache.get(cacheKey);
   if (cached) return cached;
 
-  const encounters = loadEncounters();
-  const storyData = loadStoryData();
+  const encounters = loadEncounters(gameId);
+  const storyData = loadStoryData(gameId);
 
-  // 해당 order 이하의 스토리 포인트 ID 수집
-  const availableStoryPointIds = new Set<string>();
+  // storyPointId → order 매핑 (story_order가 없는 encounter의 폴백용)
+  const storyOrderMap = new Map<string, number>();
   for (const sp of storyData) {
-    if (sp.order <= storyPointOrder) {
-      availableStoryPointIds.add(sp.id);
-    }
+    storyOrderMap.set(sp.id, sp.order);
   }
-
-  // story의 location_id도 추가
-  const storyRaw = loadRawStoryFile();
+  // story 원본의 location_id도 추가
+  const storyRaw = loadRawStoryFile(gameId);
   for (const sp of storyRaw.story_points) {
-    if (sp.order <= storyPointOrder) {
-      availableStoryPointIds.add(sp.location_id);
+    if (!storyOrderMap.has(sp.location_id)) {
+      storyOrderMap.set(sp.location_id, sp.order);
     }
   }
 
   const availableIds = new Set<number>();
   for (const enc of encounters) {
-    if (availableStoryPointIds.has(enc.storyPointId)) {
+    const order = enc.storyOrder > 0
+      ? enc.storyOrder
+      : storyOrderMap.get(enc.storyPointId);
+    if (order !== undefined && order <= storyPointOrder) {
       availableIds.add(enc.pokemonId);
     }
   }
 
-  availablePokemonIdsCache.set(storyPointOrder, availableIds);
+  availablePokemonIdsCache.set(cacheKey, availableIds);
   return availableIds;
 }
 
@@ -753,10 +832,17 @@ function buildPokemonIdMap(allPokemon: Pokemon[]): Map<number, Pokemon> {
 /**
  * 포켓몬 ID로 포켓몬 데이터 조회 — O(1) Map 조회
  */
-export function getPokemonById(id: number): Pokemon | undefined {
-  const allPokemon = loadPokemonData();
+export function getPokemonById(id: number, gameVersion?: string): Pokemon | undefined {
+  const allPokemon = loadPokemonData(gameVersion);
   const idMap = buildPokemonIdMap(allPokemon);
   return idMap.get(id);
+}
+
+/**
+ * 유효한 gameVersion인지 검증 (GAME_FILE_MAP에 존재하는지 확인)
+ */
+export function isValidGameVersion(gameVersion: string): boolean {
+  return gameVersion in GAME_FILE_MAP;
 }
 
 /**

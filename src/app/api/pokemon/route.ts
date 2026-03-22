@@ -10,7 +10,7 @@ import { withRateLimit } from "@/lib/rate-limit";
 export const GET = withRateLimit(async (request: NextRequest) => {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const gameVersion = searchParams.get("gameVersion") as "sword" | "shield" | null;
+    const gameVersion = searchParams.get("gameVersion");
     const fields = searchParams.get("fields");
     const pokemon = loadPokemonData(gameVersion ?? undefined);
 

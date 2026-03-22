@@ -13,6 +13,7 @@ import {
   loadStoryData,
   loadTypeChart,
   getPokemonById,
+  isValidGameVersion,
 } from "@/lib/data-loader";
 import { recommendParty } from "@/lib/scoring";
 import { withRateLimit } from "@/lib/rate-limit";
@@ -31,7 +32,7 @@ export const POST = withRateLimit(async (request: NextRequest) => {
         finalOnly?: boolean;
         gen8Only?: boolean;
         selectedTypes?: string[];
-        gameVersion?: 'sword' | 'shield';
+        gameVersion?: string;
       };
     };
 
@@ -102,7 +103,7 @@ export const POST = withRateLimit(async (request: NextRequest) => {
           );
         }
       }
-      if (filters.gameVersion !== undefined && filters.gameVersion !== "sword" && filters.gameVersion !== "shield") {
+      if (filters.gameVersion !== undefined && (typeof filters.gameVersion !== "string" || !isValidGameVersion(filters.gameVersion))) {
         return NextResponse.json(
           { error: "필터 옵션(gameVersion)이 올바르지 않습니다." },
           { status: 400 },
@@ -112,7 +113,7 @@ export const POST = withRateLimit(async (request: NextRequest) => {
 
     // 데이터 로드 (게임 버전별 포켓몬 JSON 분리 지원)
     const allPokemon = loadPokemonData(filters?.gameVersion);
-    const storyData = loadStoryData();
+    const storyData = loadStoryData(filters?.gameVersion);
     const typeChart = loadTypeChart();
 
     // 스토리 포인트 찾기 (optional — 없으면 자유 추천)
@@ -131,7 +132,7 @@ export const POST = withRateLimit(async (request: NextRequest) => {
     const fixed = (fixedPokemon as string[])
       .map((idStr) => {
         const id = parseInt(idStr, 10);
-        return getPokemonById(id);
+        return getPokemonById(id, filters?.gameVersion);
       })
       .filter((p) => p !== undefined);
 
