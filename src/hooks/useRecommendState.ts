@@ -91,6 +91,8 @@ function usePokemonLoader(currentStep: number, selectedGameId: string | null, ga
   useEffect(() => {
     if (currentStep < 2 || !selectedGameId) return;
 
+    const abortController = new AbortController();
+
     async function fetchPokemon() {
       try {
         setPokemonLoading(true);
@@ -98,23 +100,35 @@ function usePokemonLoader(currentStep: number, selectedGameId: string | null, ga
         const params = gameVersion ? `?gameVersion=${gameVersion}` : '';
         const cacheKey = `pokemon-list-${gameVersion ?? 'all'}`;
         const data = await cachedFetch(cacheKey, async () => {
-          const res = await fetch(`/api/pokemon${params}`);
+          const res = await fetch(`/api/pokemon${params}`, {
+            signal: abortController.signal,
+          });
           if (!res.ok) {
             const d = await res.json().catch(() => ({}));
             throw new Error(d.error || '포켓몬 목록을 불러오지 못했습니다.');
           }
           return res.json();
         });
-        setAllPokemon(data.pokemon);
+        if (!abortController.signal.aborted) {
+          setAllPokemon(data.pokemon);
+        }
       } catch (err) {
-        setPokemonError(
-          getClientErrorMessage(err, '알 수 없는 오류가 발생했습니다.')
-        );
+        if (!abortController.signal.aborted) {
+          setPokemonError(
+            getClientErrorMessage(err, '알 수 없는 오류가 발생했습니다.')
+          );
+        }
       } finally {
-        setPokemonLoading(false);
+        if (!abortController.signal.aborted) {
+          setPokemonLoading(false);
+        }
       }
     }
     fetchPokemon();
+
+    return () => {
+      abortController.abort();
+    };
   }, [currentStep, selectedGameId, gameVersion]);
 
   return { allPokemon, pokemonLoading, pokemonError };
@@ -160,8 +174,14 @@ function useRecommendations(
   const [activePartyIndex, setActivePartyIndex] = useState(0);
   const [recommendLoading, setRecommendLoading] = useState(false);
   const [recommendError, setRecommendError] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchRecommendations = useCallback(async () => {
+    // 이전 요청 취소
+    abortControllerRef.current?.abort();
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     try {
       setRecommendLoading(true);
       setRecommendError(null);
@@ -185,6 +205,7 @@ function useRecommendations(
             gameVersion: gameVersion ?? undefined,
           },
         }),
+        signal: abortController.signal,
       });
 
       if (!res.ok) {
@@ -193,16 +214,29 @@ function useRecommendations(
       }
 
       const data = await res.json();
-      setParties(data.parties || []);
-      setActivePartyIndex(0);
+      if (!abortController.signal.aborted) {
+        setParties(data.parties || []);
+        setActivePartyIndex(0);
+      }
     } catch (err) {
-      setRecommendError(
-        getClientErrorMessage(err, '알 수 없는 오류가 발생했습니다.')
-      );
+      if (!abortController.signal.aborted) {
+        setRecommendError(
+          getClientErrorMessage(err, '알 수 없는 오류가 발생했습니다.')
+        );
+      }
     } finally {
-      setRecommendLoading(false);
+      if (!abortController.signal.aborted) {
+        setRecommendLoading(false);
+      }
     }
   }, [gameVersion, fixedPokemonIds, filters.excludeTradeEvolution, filters.excludeItemEvolution, filters.includeStarters, filters.finalOnly, filters.gen8Only, filters.selectedTypes]);
+
+  // 컴포넌트 unmount 시 진행 중인 요청 취소
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
 
   // 현재 보고 있는 파티의 추천 목록 (하위 호환)
   const recommendations = parties[activePartyIndex] ?? [];
@@ -325,7 +359,7 @@ export function useRecommendState() {
   // 네비게이션
   const canGoNext = () => {
     if (currentStep === 1) return !!gameSelection.selectedGameId;
-    if (currentStep === 2) return true;
+    if (currentStep === 2) return fixedPokemonState.fixedPokemonList.length > 0;
     return false;
   };
 
