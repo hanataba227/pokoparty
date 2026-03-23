@@ -51,7 +51,7 @@ export default function MyPage() {
     setLoadingParties(true);
     setError('');
     try {
-      const res = await fetch(`/api/parties?page=${page}&limit=10`);
+      const res = await fetch(`/api/parties?page=${page}&limit=9`);
       if (!res.ok) {
         if (res.status === 401) {
           router.replace('/login?redirect=/mypage');

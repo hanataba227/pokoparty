@@ -31,7 +31,7 @@ export const GET = withRateLimit(async (request: NextRequest) => {
     const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
     const limit = Math.min(
       50,
-      Math.max(1, parseInt(searchParams.get("limit") ?? "10", 10)),
+      Math.max(1, parseInt(searchParams.get("limit") ?? "9", 10)),
     );
     const offset = (page - 1) * limit;
 

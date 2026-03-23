@@ -181,6 +181,7 @@ export default function RecommendPreviewPage() {
                       key={rec.pokemon.id}
                       pokemon={rec.pokemon}
                       score={rec.breakdown}
+                      totalScore={rec.score}
                       detailedReasons={rec.detailedReasons}
                     />
                   ))}
@@ -242,6 +243,7 @@ export default function RecommendPreviewPage() {
                           key={rec.pokemon.id}
                           pokemon={rec.pokemon}
                           score={rec.breakdown}
+                          totalScore={rec.score}
                           detailedReasons={rec.detailedReasons}
                         />
                       ))}

@@ -20,15 +20,17 @@ const REASON_LABELS: Record<DetailedReason['category'], { icon: string; label: s
 interface PokemonCardProps {
   pokemon: Pokemon;
   score?: ScoringBreakdown;
+  /** 추천 엔진이 계산한 총점 (attackType별 가중치 적용 완료). 없으면 기본 가중치로 재계산 */
+  totalScore?: number;
   detailedReasons?: DetailedReason[];
   isFixed?: boolean;
   compact?: boolean;
   onClick?: () => void;
 }
 
-const PokemonCard = memo(function PokemonCard({ pokemon, score, detailedReasons, isFixed, compact, onClick }: PokemonCardProps) {
+const PokemonCard = memo(function PokemonCard({ pokemon, score, totalScore: totalScoreProp, detailedReasons, isFixed, compact, onClick }: PokemonCardProps) {
   const spriteUrl = getSpriteUrl(pokemon.id);
-  const totalScore = score ? Math.round(getFinalScore(score)) : null;
+  const totalScore = score ? (totalScoreProp != null ? Math.round(totalScoreProp) : Math.round(getFinalScore(score))) : null;
 
   return (
     <div

@@ -79,14 +79,18 @@ export default function SavedPartyCard({ party, gradeInfo, onDelete }: SavedPart
         ))}
       </div>
 
-      {/* Game info */}
-      {party.game_id && (
-        <span className="inline-block text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full mb-1">
-          {getGameById(party.game_id)?.label ?? party.game_id}
-        </span>
-      )}
-
-      <p className="text-xs text-slate-400 mb-3">{dateStr}</p>
+      {/* Game info + date */}
+      <div className="flex items-center justify-between mb-3">
+        {party.game_id && (
+          <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+            {(() => {
+              const game = getGameById(party.game_id);
+              return game ? `${game.label}(${game.generation}세대)` : party.game_id;
+            })()}
+          </span>
+        )}
+        <span className="text-xs text-slate-400">{dateStr}</span>
+      </div>
 
       {/* Action Buttons */}
       {showConfirm ? (

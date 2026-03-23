@@ -339,6 +339,7 @@ export default function RecommendPage() {
                       key={rec.pokemon.id}
                       pokemon={rec.pokemon}
                       score={rec.breakdown}
+                      totalScore={rec.score}
                       detailedReasons={rec.detailedReasons}
                     />
                   ))}

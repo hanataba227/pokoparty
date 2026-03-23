@@ -285,7 +285,9 @@ export function scoreAcquisition(
   const totalSP = getTotalStoryPoints(gameVersion);
   if (totalSP === 0) return 0;
   const ratio = (totalSP - entry + 1) / totalSP;
-  return Math.max(0, Math.round(Math.pow(ratio, 2.0) * 100));
+  // encounter story_order가 totalSP를 초과하면 음수 ratio가 되므로 0 반환
+  if (ratio <= 0) return 0;
+  return Math.round(Math.pow(ratio, 2.0) * 100);
 }
 
 // ========================================
