@@ -42,8 +42,10 @@ export function calculateGrade(
   const maxTypes = Math.min(partyTypes.length * 2, 18);
   const diversity = maxTypes > 0 ? (uniqueTypes.size / maxTypes) * 100 : 0;
 
-  // 4. 종합 점수
-  const totalScore = Math.round(offense * 0.4 + defense * 0.4 + diversity * 0.2);
+  // 4. 종합 점수 (6마리 미만 페널티: 빈 슬롯당 -5점)
+  const partySize = partyTypes.length;
+  const sizePenalty = partySize < 6 ? (6 - partySize) * 5 : 0;
+  const totalScore = Math.max(0, Math.round(offense * 0.4 + defense * 0.4 + diversity * 0.2) - sizePenalty);
 
   // 5. 등급 판정
   const grade = getGradeFromScore(totalScore);
@@ -63,6 +65,11 @@ export function calculateGrade(
     suggestions.push(
       `${uncovered.join(", ")} 타입을 효과적으로 공격할 수 없습니다`
     );
+  }
+
+  // 인원 부족 제안
+  if (partySize < 6) {
+    suggestions.push(`파티가 ${partySize}마리뿐입니다. ${6 - partySize}마리를 더 추가해보세요`);
   }
 
   // 다양성 부족 제안

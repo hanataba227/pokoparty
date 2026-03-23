@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import ProfileSection from '@/components/ProfileSection';
 import SavedPartyList from '@/components/SavedPartyList';
+import DeleteAccountModal from '@/components/DeleteAccountModal';
 import EmptyState from '@/components/EmptyState';
 import type { SavedPartyWithGrade } from '@/components/SavedPartyList';
 import { UI } from '@/lib/ui-tokens';
@@ -37,13 +38,14 @@ function SkeletonCards() {
 }
 
 export default function MyPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, deleteAccount } = useAuth();
   const router = useRouter();
   const [parties, setParties] = useState<SavedPartyWithGrade[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [loadingParties, setLoadingParties] = useState(true);
   const [error, setError] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const fetchParties = useCallback(async (page: number) => {
     setLoadingParties(true);
@@ -84,6 +86,11 @@ export default function MyPage() {
     setCurrentPage(page);
   };
 
+  const handleDeleteAccount = async () => {
+    await deleteAccount();
+    router.replace('/');
+  };
+
   const handleDelete = async (id: string) => {
     const res = await fetch(`/api/parties/${id}`, { method: 'DELETE' });
     if (!res.ok) {
@@ -116,7 +123,7 @@ export default function MyPage() {
 
   return (
     <div className="py-8 space-y-6">
-      <ProfileSection user={user} />
+      <ProfileSection user={user} onDeleteAccount={() => setShowDeleteModal(true)} />
 
       {error && (
         <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
@@ -137,6 +144,13 @@ export default function MyPage() {
           onDelete={handleDelete}
         />
       )}
+
+      <DeleteAccountModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDeleteAccount}
+        confirmText={user.user_metadata?.display_name || user.email?.split('@')[0] || ''}
+      />
     </div>
   );
 }

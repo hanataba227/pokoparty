@@ -54,13 +54,16 @@ export default function RecommendPage() {
   } = useRecommendState();
 
   return (
-    <div className="min-h-screen py-8">
-      <h1 className="text-3xl font-bold text-center text-slate-900 mb-2">
-        파티 추천
-      </h1>
-      <p className="text-center text-slate-500 mb-8">
-        최적의 파티를 추천받으세요.
-      </p>
+    <div className={`min-h-screen ${UI.pageBg}`}>
+      <div className="max-w-6xl mx-auto px-4 py-8 sm:py-12">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-slate-900">
+            파티 추천
+          </h1>
+          <p className="mt-2 text-slate-500">
+            최적의 파티를 추천받으세요.
+          </p>
+        </div>
 
       <StepIndicator steps={STEPS} currentStep={currentStep} onStepClick={setCurrentStep} />
 
@@ -287,8 +290,8 @@ export default function RecommendPage() {
                   ))}
                 </div>
 
-                {/* 파티 저장 영역 - 하단 고정 */}
-                <div className="sticky bottom-4 mt-12 text-center z-10">
+                {/* 파티 저장 영역 */}
+                <div className="mt-10 text-center">
                   {saveSuccess ? (
                     <p className="text-green-600 font-medium">
                       파티가 저장되었습니다! 마이페이지에서 확인하세요.
@@ -389,6 +392,7 @@ export default function RecommendPage() {
             </button>
           )}
         </div>
+      </div>
       </div>
     </div>
   );

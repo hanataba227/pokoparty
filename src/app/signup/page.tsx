@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase-browser';
 import { getAuthErrorMessage } from '@/lib/auth-error';
 import { useAuthRedirect } from '@/hooks/useAuthRedirect';
@@ -24,8 +25,15 @@ export default function SignupPage() {
 
 function SignupContent() {
   const { router, user, authLoading } = useAuthRedirect();
+  const searchParams = useSearchParams();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get('error') === 'already_registered') {
+      setError('이미 가입된 계정입니다. 로그인을 진행해주세요.');
+    }
+  }, [searchParams]);
   const [success, setSuccess] = useState(false);
 
   const handleSubmit = async (data: {
@@ -102,7 +110,7 @@ function SignupContent() {
               loading={loading}
             />
             <div className="mt-4">
-              <OAuthButton />
+              <OAuthButton mode="signup" />
             </div>
           </div>
         )}

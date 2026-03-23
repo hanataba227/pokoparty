@@ -894,6 +894,35 @@ export function findPokemonAcrossGames(
 }
 
 /**
+ * 전 게임 파일에서 포켓몬 ID→한글이름 맵 구축 (파티 목록 등 이름 표시용)
+ * 한 번 로드 후 캐시하여 재사용
+ */
+export function loadAllPokemonNames(): Map<number, string> {
+  const cached = cGet<Map<number, string>>("allPokemonNames");
+  if (cached) return cached;
+
+  const nameMap = new Map<number, string>();
+  const pokemonDir = getDataPath("pokemon");
+  const files = fs.readdirSync(pokemonDir).filter((f) => f.endsWith("-pokemon.json"));
+
+  for (const file of files) {
+    try {
+      const raw = JSON.parse(fs.readFileSync(path.join(pokemonDir, file), "utf-8")) as RawPokemonFile;
+      for (const p of raw.pokemon) {
+        if (!nameMap.has(p.id)) {
+          nameMap.set(p.id, p.name_ko || p.name);
+        }
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  cSet("allPokemonNames", nameMap);
+  return nameMap;
+}
+
+/**
  * 유효한 gameVersion인지 검증 (GAME_FILE_MAP에 존재하는지 확인)
  */
 export function isValidGameVersion(gameVersion: string): boolean {

@@ -313,4 +313,43 @@ export interface SavedParty {
   game_id: string;
   story_point_id: string | null;
   created_at: string;
+  /** 서버에서 전 게임 데이터 기반으로 채워주는 포켓몬 이름 배열 */
+  pokemon_names?: string[];
+}
+
+// ========================================
+// 파티 비교 관련 타입
+// ========================================
+
+/** 파티 비교 요청 */
+export interface CompareRequest {
+  partyA: string[];
+  partyB: string[];
+}
+
+/** 비교 대상 파티 분석 결과 */
+export interface ComparePartyResult {
+  pokemon: Pokemon[];
+  analysis: AnalysisResult;
+  totalBaseStats: number;
+}
+
+/** 비교 승자 판정 */
+export type CompareWinner = "A" | "B" | "tie";
+
+/** 비교 요약 */
+export interface ComparisonSummary {
+  coverageWinner: CompareWinner;
+  defenseWinner: CompareWinner;
+  gradeWinner: CompareWinner;
+  statsWinner: CompareWinner;
+  diversityWinner: CompareWinner;
+  highlights: string[];
+}
+
+/** 파티 비교 응답 */
+export interface CompareResponse {
+  partyA: ComparePartyResult;
+  partyB: ComparePartyResult;
+  comparison: ComparisonSummary;
 }

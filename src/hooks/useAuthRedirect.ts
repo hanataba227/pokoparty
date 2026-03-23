@@ -19,7 +19,12 @@ export function useAuthRedirect() {
 
   useEffect(() => {
     if (!authLoading && user) {
-      router.replace(redirect);
+      // OAuth 신규 유저(display_name 미설정)는 온보딩으로 보냄
+      if (!user.user_metadata?.display_name) {
+        router.replace('/onboarding');
+      } else {
+        router.replace(redirect);
+      }
     }
   }, [user, authLoading, router, redirect]);
 

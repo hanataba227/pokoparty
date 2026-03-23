@@ -3,7 +3,11 @@
 import { useState } from 'react';
 import { createBrowserSupabase } from '@/lib/supabase-browser';
 
-export default function OAuthButton() {
+interface OAuthButtonProps {
+  mode?: 'login' | 'signup';
+}
+
+export default function OAuthButton({ mode = 'login' }: OAuthButtonProps) {
   const [loading, setLoading] = useState(false);
 
   const handleGoogleLogin = async () => {
@@ -12,7 +16,7 @@ export default function OAuthButton() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin + '/auth/callback',
+        redirectTo: `${window.location.origin}/auth/callback?mode=${mode}`,
       },
     });
     if (error) {
@@ -55,7 +59,7 @@ export default function OAuthButton() {
             fill="#EA4335"
           />
         </svg>
-        {loading ? '연결 중...' : '구글로 로그인'}
+        {loading ? '연결 중...' : mode === 'signup' ? '구글로 회원가입' : '구글로 로그인'}
       </button>
     </div>
   );

@@ -16,12 +16,14 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   signOut: async () => {},
+  deleteAccount: async () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -51,8 +53,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   }, [supabase]);
 
+  const deleteAccount = useCallback(async () => {
+    const res = await fetch("/api/account/delete", { method: "DELETE" });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || "회원탈퇴에 실패했습니다.");
+    }
+    // 서버에서 유저 삭제 완료 → 클라이언트 세션 정리
+    await supabase.auth.signOut();
+  }, [supabase]);
+
   return (
-    <AuthContext.Provider value={{ user, loading, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signOut, deleteAccount }}>
       {children}
     </AuthContext.Provider>
   );

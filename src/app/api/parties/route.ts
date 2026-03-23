@@ -7,33 +7,13 @@ import { createServerSupabase } from "@/lib/supabase-server";
 import { requireAuth } from "@/lib/auth-guard";
 import { getApiErrorMessage } from "@/lib/api-error";
 import { withRateLimit } from "@/lib/rate-limit";
-import { loadPokemonData, loadTypeChart } from "@/lib/data-loader";
+import { loadPokemonData, loadTypeChart, loadAllPokemonNames } from "@/lib/data-loader";
 import { analyzeParty } from "@/lib/party-analysis";
+import { getGameById } from "@/lib/game-data";
 
 /** 유저당 최대 저장 파티 수 */
 const MAX_PARTIES = 30;
 
-/** 허용되는 game_id 목록 — GAME_TITLES의 gameId 변환 결과와 일치해야 함 */
-const VALID_GAME_IDS = [
-  "sword-shield",
-  "gen8-pla",
-  "gen9-sv",
-  "gen1-rgby",
-  "gen1-frlg",
-  "gen1-lpe",
-  "gen2-gsc",
-  "gen2-hgss",
-  "gen3-rse",
-  "gen3-oras",
-  "gen4-dppt",
-  "gen4-bdsp",
-  "gen5-bw",
-  "gen5-b2w2",
-  "gen6-xy",
-  "gen7-sm",
-  "gen7-usum",
-  "gen8-swsh",
-];
 
 export const GET = withRateLimit(async (request: NextRequest) => {
   try {
@@ -73,24 +53,28 @@ export const GET = withRateLimit(async (request: NextRequest) => {
     const typeChart = loadTypeChart();
     const pokemonMap = new Map(allPokemon.map((p) => [p.id, p]));
 
-    // 각 파티에 gradeInfo 계산
+    // 전 게임 포켓몬 이름 맵 (파티 목록 이름 표시용)
+    const allNames = loadAllPokemonNames();
+
+    // 각 파티에 gradeInfo + pokemon_names 계산
     const partiesWithGrade = (parties ?? []).map((party) => {
       try {
         const pokemonIds: number[] = party.pokemon_ids;
+        const pokemonNames = pokemonIds.map((id) => allNames.get(id) ?? `#${id}`);
         const partyPokemon = pokemonIds
           .map((id) => pokemonMap.get(id))
           .filter((p) => p !== undefined);
 
         if (partyPokemon.length === 0) {
-          return { ...party, gradeInfo: null };
+          return { ...party, gradeInfo: null, pokemon_names: pokemonNames };
         }
 
         const partyTypes = partyPokemon.map((p) => p.types);
         const { gradeInfo } = analyzeParty(partyTypes, typeChart);
 
-        return { ...party, gradeInfo };
+        return { ...party, gradeInfo, pokemon_names: pokemonNames };
       } catch {
-        return { ...party, gradeInfo: null };
+        return { ...party, gradeInfo: null, pokemon_names: [] };
       }
     });
 
@@ -167,8 +151,8 @@ export const POST = withRateLimit(async (request: NextRequest) => {
       );
     }
 
-    // game_id 검증
-    if (typeof game_id !== "string" || !VALID_GAME_IDS.includes(game_id)) {
+    // game_id 검증 — game-data.ts의 게임 목록과 동기화
+    if (typeof game_id !== "string" || !getGameById(game_id)) {
       return NextResponse.json(
         { error: "올바르지 않은 게임 ID입니다." },
         { status: 400 },

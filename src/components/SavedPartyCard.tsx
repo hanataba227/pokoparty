@@ -7,6 +7,7 @@ import type { SavedParty, GradeInfo } from '@/types/pokemon';
 import { getSpriteUrl } from '@/lib/sprite';
 import { UI } from '@/lib/ui-tokens';
 import { getGradeColor, getGradeBgColor } from '@/lib/party-grade';
+import { getGameById } from '@/lib/game-data';
 
 interface SavedPartyCardProps {
   party: SavedParty;
@@ -81,7 +82,7 @@ export default function SavedPartyCard({ party, gradeInfo, onDelete }: SavedPart
       {/* Game info */}
       {party.game_id && (
         <span className="inline-block text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full mb-1">
-          {party.game_id === 'sword-shield' ? '소드/실드' : party.game_id}
+          {getGameById(party.game_id)?.label ?? party.game_id}
         </span>
       )}
 

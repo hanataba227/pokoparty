@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, Suspense, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase-browser';
 import { getAuthErrorMessage } from '@/lib/auth-error';
 import { useAuthRedirect } from '@/hooks/useAuthRedirect';
@@ -24,8 +25,16 @@ export default function LoginPage() {
 
 function LoginContent() {
   const { router, user, authLoading, redirect } = useAuthRedirect();
+  const searchParams = useSearchParams();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // OAuth 콜백에서 미가입 계정 에러 전달 시 표시
+  useEffect(() => {
+    if (searchParams.get('error') === 'no_account') {
+      setError('가입되지 않은 계정입니다. 먼저 회원가입을 진행해주세요.');
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (data: { email: string; password: string }) => {
     setError('');
@@ -72,7 +81,7 @@ function LoginContent() {
             loading={loading}
           />
           <div className="mt-4">
-            <OAuthButton />
+            <OAuthButton mode="login" />
           </div>
         </div>
       </div>

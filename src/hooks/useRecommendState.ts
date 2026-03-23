@@ -223,9 +223,7 @@ function usePartySave(
     if (allPokemonIds.length === 0) return;
 
     const gameEntry = getGameById(selectedGameId ?? '');
-    const gameId = selectedGameId === 'sword' || selectedGameId === 'shield'
-      ? 'sword-shield'
-      : selectedGameId || '';
+    const gameId = selectedGameId || '';
 
     try {
       setSaving(true);

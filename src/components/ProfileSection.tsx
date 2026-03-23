@@ -8,9 +8,10 @@ import { UI } from '@/lib/ui-tokens';
 
 interface ProfileSectionProps {
   user: User;
+  onDeleteAccount?: () => void;
 }
 
-export default function ProfileSection({ user }: ProfileSectionProps) {
+export default function ProfileSection({ user, onDeleteAccount }: ProfileSectionProps) {
   const displayName = user.user_metadata?.display_name || user.email?.split('@')[0] || '유저';
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(displayName);
@@ -31,13 +32,21 @@ export default function ProfileSection({ user }: ProfileSectionProps) {
     }
     setSaving(true);
     try {
+      // 닉네임 중복 확인
+      const checkRes = await fetch(`/api/account/check-nickname?name=${encodeURIComponent(name.trim())}`);
+      const checkData = await checkRes.json();
+      if (!checkRes.ok || !checkData.available) {
+        alert('이미 사용 중인 닉네임입니다.');
+        setSaving(false);
+        return;
+      }
+
       const supabase = createBrowserSupabase();
       const { error } = await supabase.auth.updateUser({
         data: { display_name: name.trim() },
       });
       if (!error) {
         setCurrentName(name.trim());
-        // Also update profiles table
         await supabase
           .from('profiles')
           .update({ display_name: name.trim() })
@@ -117,6 +126,16 @@ export default function ProfileSection({ user }: ProfileSectionProps) {
           <p className="text-sm text-slate-500 mt-0.5 truncate">{user.email}</p>
           <p className="text-xs text-slate-400 mt-1">가입일: {createdAt}</p>
         </div>
+
+        {/* 회원 탈퇴 */}
+        {onDeleteAccount && (
+          <button
+            onClick={onDeleteAccount}
+            className="shrink-0 self-center text-sm text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
+          >
+            회원 탈퇴
+          </button>
+        )}
       </div>
     </div>
   );

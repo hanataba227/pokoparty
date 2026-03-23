@@ -2,14 +2,15 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Menu, X, Github, User, LogOut, ChevronDown } from 'lucide-react';
+import { useRouter, usePathname } from 'next/navigation';
+import { Menu, X, Github, User, LogOut, ChevronDown, MessageSquare } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { UI } from '@/lib/ui-tokens';
 
 const navLinks = [
   { href: '/recommend', label: '파티 추천' },
   { href: '/analyze', label: '파티 분석' },
+  { href: '/compare', label: '파티 비교' },
   { href: '/pokedex', label: '포켓몬 도감' },
 ];
 
@@ -19,6 +20,7 @@ function Navbar() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { user, loading, signOut } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -50,15 +52,22 @@ function Navbar() {
 
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center gap-4">
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="text-sm text-slate-600 hover:text-indigo-600 font-medium transition-colors duration-200 cursor-pointer"
-            >
-              {link.label}
-            </Link>
-          ))}
+          {navLinks.map((link) => {
+            const isActive = pathname.startsWith(link.href);
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors duration-200 cursor-pointer ${
+                  isActive
+                    ? 'bg-indigo-50 text-indigo-600'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-indigo-600'
+                }`}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
 
           {/* Auth Section - Desktop */}
           {loading ? (
@@ -73,7 +82,7 @@ function Navbar() {
                   <User className="w-4 h-4 text-indigo-600" />
                 </div>
                 <span className="text-sm font-medium max-w-[100px] truncate">
-                  {user.user_metadata?.display_name || user.email?.split('@')[0] || '유저'}
+                  {user.user_metadata?.display_name || '게스트'}
                 </span>
                 <ChevronDown className="w-3.5 h-3.5" />
               </button>
@@ -132,16 +141,23 @@ function Navbar() {
       {mobileMenuOpen && (
         <div className={`md:hidden border-t ${UI.rowBorder} ${UI.pageBg}`}>
           <div className="px-4 py-3 space-y-2">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setMobileMenuOpen(false)}
-                className="block py-2 text-slate-600 hover:text-indigo-600 font-medium transition-colors duration-200 cursor-pointer"
-              >
-                {link.label}
-              </Link>
-            ))}
+            {navLinks.map((link) => {
+              const isActive = pathname.startsWith(link.href);
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`block py-2 px-3 rounded-lg font-medium transition-colors duration-200 cursor-pointer ${
+                    isActive
+                      ? 'bg-indigo-50 text-indigo-600'
+                      : 'text-slate-600 hover:bg-slate-50 hover:text-indigo-600'
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
 
             <div className={`border-t ${UI.rowBorder} pt-2 mt-2`}>
               {loading ? (
@@ -153,7 +169,7 @@ function Navbar() {
                       <User className="w-3.5 h-3.5 text-indigo-600" />
                     </div>
                     <span className="truncate">
-                      {user.user_metadata?.display_name || user.email?.split('@')[0] || '유저'}
+                      {user.user_metadata?.display_name || '게스트'}
                     </span>
                   </div>
                   <Link
@@ -199,19 +215,39 @@ function Navbar() {
 function Footer() {
   return (
     <footer className={`${UI.pageBg} border-t ${UI.rowBorder}`}>
-      <div className="max-w-6xl mx-auto px-4 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div className="max-w-6xl mx-auto px-4 py-6 flex flex-col sm:flex-row items-center justify-between gap-3">
         <p className="text-slate-400 text-sm">
           &copy; {new Date().getFullYear()} PokoParty. All rights reserved.
         </p>
-        <a
-          href="https://github.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1.5 text-slate-400 hover:text-slate-600 transition-colors duration-200 cursor-pointer"
-        >
-          <Github className="w-5 h-5" />
-          <span className="text-sm">GitHub</span>
-        </a>
+        <div className="flex items-center gap-3 text-sm text-slate-400">
+          <Link href="/terms" className="hover:text-slate-600 transition-colors">
+            이용약관
+          </Link>
+          <span>|</span>
+          <Link href="/privacy" className="hover:text-slate-600 transition-colors">
+            개인정보 처리방침
+          </Link>
+          <span>|</span>
+          <a
+            href="https://forms.gle/nZUyXJapiBhrd2927"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 hover:text-slate-600 transition-colors"
+          >
+            <MessageSquare className="w-4 h-4" />
+            문의하기
+          </a>
+          <span>|</span>
+          <a
+            href="https://github.com/hanataba227/pokoparty"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 hover:text-slate-600 transition-colors"
+          >
+            <Github className="w-4 h-4" />
+            GitHub
+          </a>
+        </div>
       </div>
     </footer>
   );

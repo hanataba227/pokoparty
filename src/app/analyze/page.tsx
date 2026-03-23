@@ -289,9 +289,9 @@ function AnalyzeContent() {
                                 </span>
                               </div>
                               <p className="mt-1 text-xs text-slate-500 whitespace-nowrap">
-                                {sp.pokemon_ids.slice(0, 6).map((id) => {
-                                  return pokemonMap.get(id)?.name ?? `#${id}`;
-                                }).join(', ')}
+                                {sp.pokemon_names
+                                  ? sp.pokemon_names.slice(0, 6).join(', ')
+                                  : sp.pokemon_ids.slice(0, 6).map((id) => pokemonMap.get(id)?.name ?? `#${id}`).join(', ')}
                               </p>
                             </button>
                           </li>
@@ -453,44 +453,79 @@ function AnalyzeContent() {
               </div>
             </div>
 
-            {/* 세부 점수 프로그레스 바 */}
-            {analysis.gradeInfo && (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-300 p-6">
-                <h2 className="text-lg font-semibold text-slate-900 mb-4">세부 점수</h2>
-                <div className="space-y-4">
-                  {/* 공격 커버리지 */}
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-slate-600">공격 커버리지</span>
-                      <span className="font-semibold text-slate-900">{analysis.gradeInfo.breakdown.offense}</span>
+            {/* 세부 점수 + 공격 커버리지 — 좌우 2컬럼 */}
+            <div className={`grid grid-cols-1 ${analysis.gradeInfo ? 'sm:grid-cols-2' : ''} gap-6`}>
+              {/* 세부 점수 프로그레스 바 */}
+              {analysis.gradeInfo && (
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-300 p-6">
+                  <h2 className="text-lg font-semibold text-slate-900 mb-4">세부 점수</h2>
+                  <div className="space-y-4">
+                    {/* 공격 커버리지 */}
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-slate-600">공격 커버리지</span>
+                        <span className="font-semibold text-slate-900">{analysis.gradeInfo.breakdown.offense}</span>
+                      </div>
+                      <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${analysis.gradeInfo.breakdown.offense}%` }} />
+                      </div>
                     </div>
-                    <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${analysis.gradeInfo.breakdown.offense}%` }} />
+                    {/* 방어 밸런스 */}
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-slate-600">방어 밸런스</span>
+                        <span className="font-semibold text-slate-900">{analysis.gradeInfo.breakdown.defense}</span>
+                      </div>
+                      <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-red-400 rounded-full" style={{ width: `${analysis.gradeInfo.breakdown.defense}%` }} />
+                      </div>
                     </div>
-                  </div>
-                  {/* 방어 밸런스 */}
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-slate-600">방어 밸런스</span>
-                      <span className="font-semibold text-slate-900">{analysis.gradeInfo.breakdown.defense}</span>
-                    </div>
-                    <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-red-400 rounded-full" style={{ width: `${analysis.gradeInfo.breakdown.defense}%` }} />
-                    </div>
-                  </div>
-                  {/* 타입 다양성 */}
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-slate-600">타입 다양성</span>
-                      <span className="font-semibold text-slate-900">{analysis.gradeInfo.breakdown.diversity}</span>
-                    </div>
-                    <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${analysis.gradeInfo.breakdown.diversity}%` }} />
+                    {/* 타입 다양성 */}
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-slate-600">타입 다양성</span>
+                        <span className="font-semibold text-slate-900">{analysis.gradeInfo.breakdown.diversity}</span>
+                      </div>
+                      <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${analysis.gradeInfo.breakdown.diversity}%` }} />
+                      </div>
                     </div>
                   </div>
                 </div>
+              )}
+
+              {/* 공격 커버리지 */}
+              <div className={`${UI.pageBg} rounded-2xl shadow-sm border ${UI.rowBorder} p-6`}>
+                <div className="flex items-center gap-2 mb-4">
+                  <Swords className="w-5 h-5 text-indigo-500" />
+                  <h2 className="text-lg font-semibold text-slate-900">
+                    공격 커버리지
+                  </h2>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {ALL_TYPES.map((type) => {
+                    const isCovered = analysis.coverage.includes(type);
+                    return (
+                      <div
+                        key={type}
+                        className={`rounded-lg px-1 py-0.5 ${
+                          isCovered
+                            ? 'opacity-100'
+                            : 'opacity-30 grayscale'
+                        }`}
+                      >
+                        <TypeBadge type={type} size="lg" />
+                      </div>
+                    );
+                  })}
+                </div>
+                {analysis.coverage.length < ALL_TYPES.length && (
+                  <p className="mt-3 text-xs text-slate-400">
+                    회색 타입은 효과적으로 공격할 수 없는 타입입니다.
+                  </p>
+                )}
               </div>
-            )}
+            </div>
 
             {/* 개선 제안 */}
             {analysis.gradeInfo && analysis.gradeInfo.suggestions.length > 0 && (
@@ -506,41 +541,6 @@ function AnalyzeContent() {
                 </ul>
               </div>
             )}
-
-            {/* 공격 커버리지 */}
-            <div className={`${UI.pageBg} rounded-2xl shadow-sm border ${UI.rowBorder} p-6`}>
-              <div className="flex items-center gap-2 mb-4">
-                <Swords className="w-5 h-5 text-indigo-500" />
-                <h2 className="text-lg font-semibold text-slate-900">
-                  공격 커버리지
-                </h2>
-              </div>
-              <p className="text-sm text-slate-500 mb-4">
-                파티가 효과적으로 공격할 수 있는 타입 ({analysis.coverage.length}/{ALL_TYPES.length})
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {ALL_TYPES.map((type) => {
-                  const isCovered = analysis.coverage.includes(type);
-                  return (
-                    <div
-                      key={type}
-                      className={`rounded-lg px-1 py-0.5 ${
-                        isCovered
-                          ? 'opacity-100'
-                          : 'opacity-30 grayscale'
-                      }`}
-                    >
-                      <TypeBadge type={type} size="lg" />
-                    </div>
-                  );
-                })}
-              </div>
-              {analysis.coverage.length < ALL_TYPES.length && (
-                <p className="mt-3 text-xs text-slate-400">
-                  회색 타입은 효과적으로 공격할 수 없는 타입입니다.
-                </p>
-              )}
-            </div>
           </div>
         )}
 
