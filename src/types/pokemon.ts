@@ -333,6 +333,27 @@ export interface PartyAnalysisRow {
   analyzed_at: string;
 }
 
+/** 공유된 파티 (shared_parties 테이블 — 스냅샷) */
+export interface SharedParty {
+  id: string;
+  user_id: string | null;
+  source_party_id: string | null;
+  party_name: string;
+  pokemon_ids: number[];
+  game_id: string;
+  memo: string;
+  grade: PartyGrade;
+  total_score: number;
+  offense_score: number;
+  defense_score: number;
+  diversity_score: number;
+  coverage: string[];
+  weaknesses: string[];
+  resistances: string[];
+  display_name: string;
+  shared_at: string;
+}
+
 // ========================================
 // 파티 비교 관련 타입
 // ========================================

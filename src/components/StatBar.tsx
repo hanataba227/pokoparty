@@ -37,7 +37,7 @@ export default function StatBar({ stats }: StatBarProps) {
     <div className={`${UI.border} overflow-hidden h-full flex flex-col`}>
       <div className="flex-1 flex items-center justify-center p-2">
         <div className="w-full aspect-square max-w-[280px]">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
           <RadarChart data={data} cx="50%" cy="50%" outerRadius="70%">
             <PolarGrid stroke="#e2e8f0" />
             <PolarAngleAxis

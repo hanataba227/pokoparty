@@ -16,7 +16,7 @@ interface StatRadarChartProps {
 export default function StatRadarChart({ data }: StatRadarChartProps) {
   return (
     <div className="w-full aspect-square max-w-[280px]">
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
         <RadarChart data={data} cx="50%" cy="50%" outerRadius="70%">
           <PolarGrid stroke="#e2e8f0" />
           <PolarAngleAxis
