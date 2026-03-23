@@ -263,6 +263,12 @@ function usePartySave(
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  // 추천 결과가 바뀌면 저장 상태 리셋 (다른 조합 보기 시)
+  useEffect(() => {
+    setSaveSuccess(false);
+    setSaveError(null);
+  }, [recommendations]);
+
   const handleSaveParty = useCallback(async () => {
     const allPokemonIds = [
       ...fixedPokemonList.map((p) => p.id),

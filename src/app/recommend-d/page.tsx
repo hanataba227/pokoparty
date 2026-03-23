@@ -397,32 +397,36 @@ export default function RecommendDPage() {
 
                   <div className="mt-8 flex items-center justify-center gap-4">
                     <button onClick={fetchRecommendations} disabled={recommendLoading}
-                      className="inline-flex items-center gap-2 px-8 py-3 rounded-xl border-2 border-indigo-300 text-indigo-600 font-semibold text-base
+                      className="w-52 inline-flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-indigo-300 text-indigo-600 font-semibold text-base
                         hover:bg-indigo-50 hover:border-indigo-400 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 cursor-pointer
                         focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
                       <RefreshCw className={`w-5 h-5 ${recommendLoading ? 'animate-spin' : ''}`} />
                       다른 조합 보기
                     </button>
 
-                    {saveSuccess ? (
-                      <p className="text-green-600 font-medium">파티가 저장되었습니다!</p>
-                    ) : user ? (
-                      <>
-                        <button onClick={handleSaveParty} disabled={saving}
-                          className="inline-flex items-center gap-2 px-8 py-3 rounded-xl bg-indigo-600 text-white font-semibold text-base
-                            hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 cursor-pointer
-                            focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-                          {saving ? (<><Loader2 className="w-5 h-5 animate-spin" />저장 중...</>) : (<><Save className="w-5 h-5" />파티 저장하기</>)}
-                        </button>
-                        {saveError && <p className="mt-2 text-sm text-red-500">{saveError}</p>}
-                      </>
-                    ) : (
-                      <Link href={`/login?redirect=${encodeURIComponent('/recommend-d')}`}
-                        className="inline-flex items-center gap-2 px-8 py-3 rounded-xl border-2 border-indigo-300 text-indigo-600 font-semibold text-base
-                          hover:bg-indigo-50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-                        <LogIn className="w-5 h-5" />로그인하고 파티 저장하기
-                      </Link>
-                    )}
+                    <div className="w-52">
+                      {saveSuccess ? (
+                        <span className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-green-50 border-2 border-green-300 text-green-600 font-semibold text-base">
+                          <Save className="w-5 h-5" />저장 완료!
+                        </span>
+                      ) : user ? (
+                        <>
+                          <button onClick={handleSaveParty} disabled={saving}
+                            className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-indigo-600 text-white font-semibold text-base
+                              hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 cursor-pointer
+                              focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                            {saving ? (<><Loader2 className="w-5 h-5 animate-spin" />저장 중...</>) : (<><Save className="w-5 h-5" />파티 저장하기</>)}
+                          </button>
+                          {saveError && <p className="mt-2 text-sm text-red-500">{saveError}</p>}
+                        </>
+                      ) : (
+                        <Link href={`/login?redirect=${encodeURIComponent('/recommend-d')}`}
+                          className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-indigo-300 text-indigo-600 font-semibold text-base
+                            hover:bg-indigo-50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                          <LogIn className="w-5 h-5" />로그인하고 저장
+                        </Link>
+                      )}
+                    </div>
                   </div>
                 </>
               )}
