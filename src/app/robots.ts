@@ -5,7 +5,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: '*',
       allow: '/',
-      disallow: ['/login', '/signup', '/reset-password', '/mypage'],
+      disallow: ['/login', '/signup', '/reset-password', '/mypage', '/_next/static/'],
     },
     sitemap: 'https://www.pokoparty.com/sitemap.xml',
   };

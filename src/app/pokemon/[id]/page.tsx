@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { UI } from '@/lib/ui-tokens';
 import { getSpriteUrl } from '@/lib/sprite';
-import { getPokemonById, getMovesForPokemon, loadTypeChart, loadEncounters, loadPokemonData } from '@/lib/data-loader';
+import { findPokemonAcrossGames, getMovesForPokemon, loadTypeChart, loadEncounters, loadPokemonData } from '@/lib/data-loader';
 import { getGeneration } from '@/lib/pokemon-gen';
 import TypeBadge from '@/components/TypeBadge';
 import StatBar from '@/components/StatBar';
@@ -14,13 +14,23 @@ import EncounterInfo from '@/components/EncounterInfo';
 import PokemonNav from '@/components/PokemonNav';
 import { loadPokedex } from '@/lib/pokedex-loader';
 
+/** 실제 게임 데이터가 존재하는 포켓몬만 정적 생성 */
+export function generateStaticParams() {
+  const pokedex = loadPokedex();
+  return pokedex
+    .filter((p) => !!findPokemonAcrossGames(p.id))
+    .map((p) => ({ id: String(p.id) }));
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
-  const pokemon = getPokemonById(Number(id));
-  if (!pokemon) return { title: '포켓몬을 찾을 수 없습니다' };
+  const result = findPokemonAcrossGames(Number(id));
+  if (!result) return { title: '포켓몬을 찾을 수 없습니다' };
 
+  const { pokemon } = result;
   const title = `${pokemon.name} #${pokemon.id} - 타입·기술·상성 정보`;
   const description = `${pokemon.name}의 타입, 종족값, 기술 목록, 타입 상성, 진화 정보를 확인하세요. 포코파티에서 최적의 파티를 구성하세요.`;
+  const artworkUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${pokemon.id}.png`;
 
   return {
     title,
@@ -28,7 +38,23 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     openGraph: {
       title,
       description,
-      images: [`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${pokemon.id}.png`],
+      images: [artworkUrl],
+    },
+    other: {
+      'script:ld+json': JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'Article',
+        name: `${pokemon.name} #${pokemon.id}`,
+        headline: title,
+        description,
+        image: artworkUrl,
+        url: `https://www.pokoparty.com/pokemon/${pokemon.id}`,
+        publisher: {
+          '@type': 'Organization',
+          name: '포코파티',
+          url: 'https://www.pokoparty.com',
+        },
+      }),
     },
   };
 }
@@ -41,16 +67,17 @@ export default async function PokemonDetailPage({ params }: { params: Promise<{ 
     notFound();
   }
 
-  const pokemon = getPokemonById(pokemonId);
+  const result = findPokemonAcrossGames(pokemonId);
 
-  if (!pokemon) {
+  if (!result) {
     notFound();
   }
 
-  const moves = getMovesForPokemon(pokemonId);
+  const { pokemon, gameVersion } = result;
+  const moves = getMovesForPokemon(pokemonId, gameVersion);
   const typeChart = loadTypeChart();
-  const encounters = loadEncounters().filter((e) => e.pokemonId === pokemonId);
-  const allPokemon = loadPokemonData();
+  const encounters = loadEncounters(gameVersion).filter((e) => e.pokemonId === pokemonId);
+  const allPokemon = loadPokemonData(gameVersion);
 
   // 진화 체인용 포켓몬 목록 (id + name + evolutions)
   const allPokemonBrief = allPokemon.map((p) => ({
@@ -69,8 +96,30 @@ export default async function PokemonDetailPage({ params }: { params: Promise<{ 
   const prevPokemon = currentIdx > 0 ? { id: pokedex[currentIdx - 1].id, name: pokedex[currentIdx - 1].name } : null;
   const nextPokemon = currentIdx >= 0 && currentIdx < pokedex.length - 1 ? { id: pokedex[currentIdx + 1].id, name: pokedex[currentIdx + 1].name } : null;
 
+  // JSON-LD 구조화 데이터
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    name: `${pokemon.name} #${pokemon.id}`,
+    headline: `${pokemon.name} #${pokemon.id} - 타입·기술·상성 정보`,
+    description: `${pokemon.name}의 타입, 종족값, 기술 목록, 타입 상성, 진화 정보를 확인하세요.`,
+    image: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${pokemon.id}.png`,
+    url: `https://www.pokoparty.com/pokemon/${pokemon.id}`,
+    publisher: {
+      '@type': 'Organization',
+      name: '포코파티',
+      url: 'https://www.pokoparty.com',
+    },
+  };
+
   return (
     <main className={`min-h-screen ${UI.pageBg} pb-12`}>
+      {/* JSON-LD 구조화 데이터 */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
       {/* 도감 네비게이션 */}
       <div className="max-w-4xl mx-auto px-4 pt-4">
         <PokemonNav

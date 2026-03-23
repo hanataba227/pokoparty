@@ -818,14 +818,15 @@ export function getAvailablePokemonIds(storyPointOrder: number, gameId?: string)
   return availableIds;
 }
 
-function buildPokemonIdMap(allPokemon: Pokemon[]): Map<number, Pokemon> {
-  const cached = cGet<Map<number, Pokemon>>("pokemonById");
+function buildPokemonIdMap(allPokemon: Pokemon[], gameVersion?: string): Map<number, Pokemon> {
+  const cacheKey = `pokemonById:${gameVersion ?? "sword"}`;
+  const cached = cGet<Map<number, Pokemon>>(cacheKey);
   if (cached) return cached;
   const result = new Map<number, Pokemon>();
   for (const p of allPokemon) {
     result.set(p.id, p);
   }
-  cSet("pokemonById", result);
+  cSet(cacheKey, result);
   return result;
 }
 
@@ -834,8 +835,62 @@ function buildPokemonIdMap(allPokemon: Pokemon[]): Map<number, Pokemon> {
  */
 export function getPokemonById(id: number, gameVersion?: string): Pokemon | undefined {
   const allPokemon = loadPokemonData(gameVersion);
-  const idMap = buildPokemonIdMap(allPokemon);
+  const idMap = buildPokemonIdMap(allPokemon, gameVersion);
   return idMap.get(id);
+}
+
+/**
+ * 포켓몬 ID가 포함된 게임 버전을 찾아 반환 (상세 페이지용 fallback)
+ * 기본 게임(sword)에 없는 포켓몬을 다른 게임 파일에서 검색
+ */
+export function findGameVersionForPokemon(pokemonId: number): string | undefined {
+  const cached = cGet<Map<number, string>>("pokemonIdToGame");
+  if (cached?.has(pokemonId)) return cached.get(pokemonId);
+
+  // DLC 아닌 메인 게임 우선 탐색 (세대 역순 → 최신 데이터 우선)
+  const mainGames = getAllGames()
+    .filter((g) => !g.isDlc && !g.isRemake)
+    .sort((a, b) => b.generation - a.generation);
+  const dlcGames = getAllGames()
+    .filter((g) => g.isDlc || g.isRemake)
+    .sort((a, b) => b.generation - a.generation);
+
+  for (const game of [...mainGames, ...dlcGames]) {
+    try {
+      const raw = readJsonFile<RawPokemonFile>("pokemon", GAME_FILE_MAP[game.id].pokemon);
+      if (raw.pokemon.some((p) => p.id === pokemonId)) {
+        // 캐시 업데이트
+        const map = cached ?? new Map<number, string>();
+        map.set(pokemonId, game.id);
+        cSet("pokemonIdToGame", map);
+        return game.id;
+      }
+    } catch {
+      continue;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * 포켓몬 ID로 포켓몬 데이터 조회 — 기본 게임에 없으면 전 게임에서 검색 (상세 페이지용)
+ * 반환: { pokemon, gameVersion } 또는 undefined
+ */
+export function findPokemonAcrossGames(
+  id: number,
+  preferredGame?: string
+): { pokemon: Pokemon; gameVersion: string } | undefined {
+  // 1. 지정된 게임 버전에서 먼저 찾기
+  const preferred = getPokemonById(id, preferredGame);
+  if (preferred) return { pokemon: preferred, gameVersion: preferredGame ?? "sword" };
+
+  // 2. fallback: 다른 게임에서 찾기
+  const fallbackGame = findGameVersionForPokemon(id);
+  if (!fallbackGame) return undefined;
+
+  const pokemon = getPokemonById(id, fallbackGame);
+  if (!pokemon) return undefined;
+  return { pokemon, gameVersion: fallbackGame };
 }
 
 /**

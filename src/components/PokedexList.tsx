@@ -247,6 +247,23 @@ export default function PokedexList({ pokemon, defaultPopularIds }: PokedexListP
           </div>
         </section>
       )}
+
+      {/* SEO: 크롤러용 전체 포켓몬 링크 목록 (세대 미선택 시 표시) */}
+      {!selectedGen && (
+        <nav aria-label="전체 포켓몬 도감" className="mt-8">
+          <h2 className={UI.sectionTitle}>
+            전체 도감
+            <span className="text-sm font-normal text-slate-400 ml-2">
+              {pokemon.length}마리
+            </span>
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {pokemon.map((p) => (
+              <PokemonCard key={p.id} p={p} />
+            ))}
+          </div>
+        </nav>
+      )}
     </div>
   );
 }
