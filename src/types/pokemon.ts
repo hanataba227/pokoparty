@@ -309,12 +309,28 @@ export type AttackType = "physical" | "special" | "dual";
 export interface SavedParty {
   id: string;
   name: string;
+  memo: string;
   pokemon_ids: number[];
   game_id: string;
   story_point_id: string | null;
   created_at: string;
   /** 서버에서 전 게임 데이터 기반으로 채워주는 포켓몬 이름 배열 */
   pokemon_names?: string[];
+}
+
+/** party_analysis 테이블 행 */
+export interface PartyAnalysisRow {
+  party_id: string;
+  grade: PartyGrade;
+  total_score: number;
+  offense_score: number;
+  defense_score: number;
+  diversity_score: number;
+  coverage: string[];
+  weaknesses: string[];
+  resistances: string[];
+  suggestions: string[];
+  analyzed_at: string;
 }
 
 // ========================================

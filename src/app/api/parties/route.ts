@@ -35,10 +35,10 @@ export const GET = withRateLimit(async (request: NextRequest) => {
     );
     const offset = (page - 1) * limit;
 
-    // 파티 목록 + 전체 개수를 단일 쿼리로 조회 (최신순)
+    // 파티 목록 + party_analysis JOIN + 전체 개수를 단일 쿼리로 조회 (최신순)
     const { data: parties, count, error: fetchError } = await supabase
       .from("saved_parties")
-      .select("*", { count: "exact" })
+      .select("*, party_analysis(*)", { count: "exact" })
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
@@ -51,7 +51,6 @@ export const GET = withRateLimit(async (request: NextRequest) => {
       );
     }
 
-    // TODO: 등급 사전 저장 denormalization 검토 — 현재 매 요청마다 타입 계산 + 등급 산출 반복
     // 데이터 로드 (루프 밖에서 한 번만)
     const allPokemon = loadPokemonData();
     const typeChart = loadTypeChart();
@@ -61,26 +60,68 @@ export const GET = withRateLimit(async (request: NextRequest) => {
     const allNames = loadAllPokemonNames();
 
     // 각 파티에 gradeInfo + pokemon_names 계산
-    const partiesWithGrade = (parties ?? []).map((party) => {
-      try {
-        const pokemonIds: number[] = party.pokemon_ids;
-        const pokemonNames = pokemonIds.map((id) => allNames.get(id) ?? `#${id}`);
-        const partyPokemon = pokemonIds
-          .map((id) => pokemonMap.get(id))
-          .filter((p) => p !== undefined);
+    // party_analysis가 있으면 저장된 데이터 사용, 없으면 fallback 계산 (lazy 생성)
+    const partiesWithGrade = await Promise.all(
+      (parties ?? []).map(async (party) => {
+        try {
+          const pokemonIds: number[] = party.pokemon_ids;
+          const pokemonNames = pokemonIds.map((id) => allNames.get(id) ?? `#${id}`);
 
-        if (partyPokemon.length === 0) {
-          return { ...party, gradeInfo: null, pokemon_names: pokemonNames };
+          // party_analysis JOIN 결과 (Supabase는 1:1 관계를 배열로 반환할 수 있음)
+          const analysisRow = Array.isArray(party.party_analysis)
+            ? party.party_analysis[0] ?? null
+            : party.party_analysis ?? null;
+
+          if (analysisRow) {
+            // 저장된 분석 결과를 gradeInfo 형태로 변환
+            const gradeInfo = {
+              grade: analysisRow.grade,
+              totalScore: analysisRow.total_score,
+              breakdown: {
+                offense: analysisRow.offense_score,
+                defense: analysisRow.defense_score,
+                diversity: analysisRow.diversity_score,
+              },
+              suggestions: analysisRow.suggestions ?? [],
+            };
+            return { ...party, party_analysis: undefined, gradeInfo, pokemon_names: pokemonNames };
+          }
+
+          // fallback: party_analysis 없는 기존 파티 — 계산 후 lazy 저장
+          const partyPokemon = pokemonIds
+            .map((id) => pokemonMap.get(id))
+            .filter((p) => p !== undefined);
+
+          if (partyPokemon.length === 0) {
+            return { ...party, party_analysis: undefined, gradeInfo: null, pokemon_names: pokemonNames };
+          }
+
+          const partyTypes = partyPokemon.map((p) => p.types);
+          const analysisResult = analyzeParty(partyTypes, typeChart);
+          const gradeInfo = analysisResult.gradeInfo ?? null;
+
+          // lazy 생성: party_analysis에 INSERT (실패해도 무시)
+          if (gradeInfo) {
+            await supabase.from("party_analysis").insert({
+              party_id: party.id,
+              grade: gradeInfo.grade,
+              total_score: gradeInfo.totalScore,
+              offense_score: gradeInfo.breakdown.offense,
+              defense_score: gradeInfo.breakdown.defense,
+              diversity_score: gradeInfo.breakdown.diversity,
+              coverage: analysisResult.coverage,
+              weaknesses: analysisResult.weaknesses,
+              resistances: analysisResult.resistances,
+              suggestions: gradeInfo.suggestions,
+            });
+          }
+
+          return { ...party, party_analysis: undefined, gradeInfo, pokemon_names: pokemonNames };
+        } catch {
+          return { ...party, party_analysis: undefined, gradeInfo: null, pokemon_names: [] };
         }
-
-        const partyTypes = partyPokemon.map((p) => p.types);
-        const { gradeInfo } = analyzeParty(partyTypes, typeChart);
-
-        return { ...party, gradeInfo, pokemon_names: pokemonNames };
-      } catch {
-        return { ...party, gradeInfo: null, pokemon_names: [] };
-      }
-    });
+      }),
+    );
 
     return NextResponse.json({
       parties: partiesWithGrade,
@@ -209,7 +250,55 @@ export const POST = withRateLimit(async (request: NextRequest) => {
       );
     }
 
-    return NextResponse.json(party, { status: 201 });
+    // --- 분석 결과 계산 및 저장 ---
+    let analysis = null;
+    try {
+      const allPokemon = loadPokemonData();
+      const typeChart = loadTypeChart();
+      const pokemonMap = new Map(allPokemon.map((p) => [p.id, p]));
+
+      const partyPokemon = (pokemon_ids as number[])
+        .map((id: number) => pokemonMap.get(id))
+        .filter((p) => p !== undefined);
+
+      if (partyPokemon.length > 0) {
+        const partyTypes = partyPokemon.map((p) => p.types);
+        const analysisResult = analyzeParty(partyTypes, typeChart);
+        const gradeInfo = analysisResult.gradeInfo;
+
+        if (!gradeInfo) throw new Error("gradeInfo not computed");
+
+        const analysisRow = {
+          party_id: party.id,
+          grade: gradeInfo.grade,
+          total_score: gradeInfo.totalScore,
+          offense_score: gradeInfo.breakdown.offense,
+          defense_score: gradeInfo.breakdown.defense,
+          diversity_score: gradeInfo.breakdown.diversity,
+          coverage: analysisResult.coverage,
+          weaknesses: analysisResult.weaknesses,
+          resistances: analysisResult.resistances,
+          suggestions: gradeInfo.suggestions,
+        };
+
+        await supabase.from("party_analysis").insert(analysisRow);
+
+        analysis = {
+          grade: gradeInfo.grade,
+          totalScore: gradeInfo.totalScore,
+          breakdown: gradeInfo.breakdown,
+          coverage: analysisResult.coverage,
+          weaknesses: analysisResult.weaknesses,
+          resistances: analysisResult.resistances,
+          suggestions: gradeInfo.suggestions,
+        };
+      }
+    } catch (analysisError) {
+      // 분석 저장 실패해도 파티 저장은 성공으로 처리
+      console.error("파티 분석 저장 오류:", analysisError);
+    }
+
+    return NextResponse.json({ ...party, analysis }, { status: 201 });
   } catch (error) {
     console.error("파티 저장 API 오류:", error);
     const message = getApiErrorMessage(error, "파티 저장 중 오류가 발생했습니다.");
