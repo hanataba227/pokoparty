@@ -5,7 +5,7 @@ import PartySlot from '@/components/PartySlot';
 import PokemonSearchModal from '@/components/PokemonSearchModal';
 import PokemonCard from '@/components/PokemonCard';
 import GameSelector from '@/components/GameSelector';
-import { Loader2, ChevronLeft, ChevronRight, ChevronDown, SkipForward, Save, LogIn, SlidersHorizontal, Filter } from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight, ChevronDown, SkipForward, Save, LogIn, SlidersHorizontal, Filter, RefreshCw } from 'lucide-react';
 import { TYPE_COLORS } from '@/components/TypeBadge';
 import { UI } from '@/lib/ui-tokens';
 import { ALL_TYPES } from '@/lib/type-calc';
@@ -44,8 +44,12 @@ export default function RecommendPage() {
     gen8Only, setGen8Only,
     selectedTypes, setSelectedTypes,
     recommendations,
+    parties,
+    activePartyIndex,
+    setActivePartyIndex,
     recommendLoading,
     recommendError,
+    fetchRecommendations,
     user,
     saving,
     saveSuccess,
@@ -269,6 +273,44 @@ export default function RecommendPage() {
 
             {!recommendLoading && !recommendError && (fixedPokemonList.length > 0 || recommendations.length > 0) && (
               <>
+                {/* 파티 전환 UI */}
+                {parties.length > 1 && (
+                  <div className="flex items-center justify-between mb-5">
+                    <div className="flex items-center gap-2">
+                      {parties.map((_, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setActivePartyIndex(idx)}
+                          className={`w-9 h-9 rounded-full text-sm font-bold transition-all duration-200 cursor-pointer
+                            ${activePartyIndex === idx
+                              ? 'bg-indigo-600 text-white shadow-md scale-110'
+                              : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                            }`}
+                        >
+                          {idx + 1}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setActivePartyIndex((i: number) => Math.max(0, i - 1))}
+                        disabled={activePartyIndex === 0}
+                        className="p-2 rounded-lg hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                      >
+                        <ChevronLeft className="w-5 h-5 text-slate-600" />
+                      </button>
+                      <button
+                        onClick={() => setActivePartyIndex((i: number) => Math.min(parties.length - 1, i + 1))}
+                        disabled={activePartyIndex === parties.length - 1}
+                        className="p-2 rounded-lg hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                      >
+                        <ChevronRight className="w-5 h-5 text-slate-600" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-3">
                   {/* 내가 선택한 포켓몬 (고정 멤버) */}
                   {fixedPokemonList.map((pokemon) => (
@@ -290,11 +332,25 @@ export default function RecommendPage() {
                   ))}
                 </div>
 
-                {/* 파티 저장 영역 */}
-                <div className="mt-10 text-center">
+                {/* 다른 조합 보기 + 파티 저장 */}
+                <div className="mt-8 flex items-center justify-center gap-4">
+                  <button
+                    onClick={fetchRecommendations}
+                    disabled={recommendLoading}
+                    className="inline-flex items-center gap-2 px-8 py-3 rounded-xl
+                      border-2 border-indigo-300 text-indigo-600 font-semibold text-base
+                      hover:bg-indigo-50 hover:border-indigo-400
+                      disabled:opacity-40 disabled:cursor-not-allowed
+                      transition-all duration-200 cursor-pointer
+                      focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                  >
+                    <RefreshCw className={`w-5 h-5 ${recommendLoading ? 'animate-spin' : ''}`} />
+                    다른 조합 보기
+                  </button>
+
                   {saveSuccess ? (
                     <p className="text-green-600 font-medium">
-                      파티가 저장되었습니다! 마이페이지에서 확인하세요.
+                      파티가 저장되었습니다!
                     </p>
                   ) : user ? (
                     <>

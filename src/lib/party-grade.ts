@@ -10,6 +10,14 @@ import type {
 } from "@/types/pokemon";
 import { ALL_TYPES } from "@/lib/type-calc";
 
+/** 등급 경계값 */
+const GRADE_THRESHOLDS = {
+  S: 90,
+  A: 75,
+  B: 60,
+  C: 40,
+} as const;
+
 /**
  * 파티 등급을 계산합니다.
  * @param analysis 기존 타입 분석 결과
@@ -21,14 +29,14 @@ export function calculateGrade(
   partyTypes: PokemonType[][]
 ): GradeInfo {
   // 1. 공격 커버리지 점수 (0~100)
-  const offense = (analysis.coverage.length / 18) * 100;
+  const offense = (analysis.coverage.length / ALL_TYPES.length) * 100;
 
   // 2. 방어 밸런스 점수 (0~100)
   const defense = Math.max(
     0,
     Math.min(
       100,
-      ((18 - analysis.weaknesses.length * 2 + analysis.resistances.length) / 18) * 100
+      ((ALL_TYPES.length - analysis.weaknesses.length * 2 + analysis.resistances.length) / ALL_TYPES.length) * 100
     )
   );
 
@@ -39,7 +47,7 @@ export function calculateGrade(
       uniqueTypes.add(t);
     }
   }
-  const maxTypes = Math.min(partyTypes.length * 2, 18);
+  const maxTypes = Math.min(partyTypes.length * 2, ALL_TYPES.length);
   const diversity = maxTypes > 0 ? (uniqueTypes.size / maxTypes) * 100 : 0;
 
   // 4. 종합 점수 (6마리 미만 페널티: 빈 슬롯당 -5점)
@@ -91,10 +99,10 @@ export function calculateGrade(
 
 /** 점수에서 등급 판정 */
 function getGradeFromScore(score: number): PartyGrade {
-  if (score >= 90) return "S";
-  if (score >= 75) return "A";
-  if (score >= 60) return "B";
-  if (score >= 40) return "C";
+  if (score >= GRADE_THRESHOLDS.S) return "S";
+  if (score >= GRADE_THRESHOLDS.A) return "A";
+  if (score >= GRADE_THRESHOLDS.B) return "B";
+  if (score >= GRADE_THRESHOLDS.C) return "C";
   return "D";
 }
 

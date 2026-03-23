@@ -15,16 +15,17 @@ import {
   getPokemonById,
   isValidGameVersion,
 } from "@/lib/data-loader";
-import { recommendParty } from "@/lib/scoring";
+import { recommendParty, recommendMultipleParties } from "@/lib/scoring";
 import { withRateLimit } from "@/lib/rate-limit";
 
 export const POST = withRateLimit(async (request: NextRequest) => {
   try {
     const body = await request.json();
-    const { storyPointId, fixedPokemon, slotsToFill, filters } = body as {
+    const { storyPointId, fixedPokemon, slotsToFill, filters, partyCount } = body as {
       storyPointId: unknown;
       fixedPokemon: unknown;
       slotsToFill?: unknown;
+      partyCount?: unknown;
       filters?: {
         excludeTradeEvolution?: boolean;
         excludeItemEvolution?: boolean;
@@ -136,17 +137,42 @@ export const POST = withRateLimit(async (request: NextRequest) => {
       })
       .filter((p) => p !== undefined);
 
-    // 추천 계산
+    // partyCount 검증: 정수, 1~5 범위
+    const validPartyCount = (typeof partyCount === "number" && Number.isInteger(partyCount) && partyCount >= 1 && partyCount <= 5)
+      ? partyCount
+      : undefined;
+
+    const effectiveFilters = filters ? {
+      ...filters,
+      selectedTypes: filters.selectedTypes as PokemonType[] | undefined,
+    } : undefined;
+
+    // 다중 파티 추천 (partyCount >= 2) vs 기존 단일 추천
+    if (validPartyCount && validPartyCount >= 2) {
+      const parties = recommendMultipleParties(
+        storyPoint,
+        fixed,
+        typeChart,
+        allPokemon,
+        validPartyCount,
+        slotsToFill as number | undefined,
+        effectiveFilters,
+      );
+
+      return NextResponse.json({
+        parties,
+        storyPoint,
+      });
+    }
+
+    // 기존 단일 추천 (하위 호환)
     const recommendations = recommendParty(
       storyPoint,
       fixed,
       typeChart,
       allPokemon,
       slotsToFill as number | undefined,
-      filters ? {
-        ...filters,
-        selectedTypes: filters.selectedTypes as PokemonType[] | undefined,
-      } : undefined
+      effectiveFilters,
     );
 
     return NextResponse.json({

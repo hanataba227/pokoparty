@@ -143,7 +143,7 @@ function useFilterOptions() {
   };
 }
 
-/** Step 3: 추천 결과 상태 */
+/** Step 3: 추천 결과 상태 (다중 파티) */
 function useRecommendations(
   gameVersion: string | null,
   fixedPokemonIds: string[],
@@ -156,7 +156,8 @@ function useRecommendations(
     selectedTypes: Set<PokemonType>;
   },
 ) {
-  const [recommendations, setRecommendations] = useState<RecommendationItem[]>([]);
+  const [parties, setParties] = useState<RecommendationItem[][]>([]);
+  const [activePartyIndex, setActivePartyIndex] = useState(0);
   const [recommendLoading, setRecommendLoading] = useState(false);
   const [recommendError, setRecommendError] = useState<string | null>(null);
 
@@ -173,6 +174,7 @@ function useRecommendations(
         body: JSON.stringify({
           fixedPokemon: fixedPokemonIds,
           slotsToFill,
+          partyCount: 3,
           filters: {
             excludeTradeEvolution: filters.excludeTradeEvolution,
             excludeItemEvolution: filters.excludeItemEvolution,
@@ -191,7 +193,8 @@ function useRecommendations(
       }
 
       const data = await res.json();
-      setRecommendations(data.recommendations || []);
+      setParties(data.parties || []);
+      setActivePartyIndex(0);
     } catch (err) {
       setRecommendError(
         getClientErrorMessage(err, '알 수 없는 오류가 발생했습니다.')
@@ -201,7 +204,18 @@ function useRecommendations(
     }
   }, [gameVersion, fixedPokemonIds, filters.excludeTradeEvolution, filters.excludeItemEvolution, filters.includeStarters, filters.finalOnly, filters.gen8Only, filters.selectedTypes]);
 
-  return { recommendations, recommendLoading, recommendError, fetchRecommendations };
+  // 현재 보고 있는 파티의 추천 목록 (하위 호환)
+  const recommendations = parties[activePartyIndex] ?? [];
+
+  return {
+    recommendations,
+    parties,
+    activePartyIndex,
+    setActivePartyIndex,
+    recommendLoading,
+    recommendError,
+    fetchRecommendations,
+  };
 }
 
 /** 파티 저장 상태 */

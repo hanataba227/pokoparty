@@ -7,7 +7,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import type { AnalysisResult } from "@/types/pokemon";
-import { loadPokemonData, loadTypeChart } from "@/lib/data-loader";
+import { loadPokemonData, loadTypeChart, isValidGameVersion } from "@/lib/data-loader";
 import { getApiErrorMessage } from "@/lib/api-error";
 import { withRateLimit } from "@/lib/rate-limit";
 import { analyzeParty } from "@/lib/party-analysis";
@@ -15,7 +15,7 @@ import { analyzeParty } from "@/lib/party-analysis";
 export const POST = withRateLimit(async (request: NextRequest) => {
   try {
     const body = await request.json();
-    const { pokemonIds } = body as { pokemonIds: unknown };
+    const { pokemonIds, gameVersion } = body as { pokemonIds: unknown; gameVersion?: unknown };
 
     // 유효성 검사
     if (!Array.isArray(pokemonIds) || pokemonIds.length === 0) {
@@ -49,8 +49,16 @@ export const POST = withRateLimit(async (request: NextRequest) => {
       }
     }
 
+    // gameVersion 검증
+    if (gameVersion !== undefined && (typeof gameVersion !== "string" || !isValidGameVersion(gameVersion))) {
+      return NextResponse.json(
+        { error: "올바르지 않은 게임 버전입니다." },
+        { status: 400 },
+      );
+    }
+
     // 데이터 로드
-    const allPokemon = loadPokemonData();
+    const allPokemon = loadPokemonData(gameVersion as string | undefined);
     const typeChart = loadTypeChart();
 
     // 포켓몬 조회

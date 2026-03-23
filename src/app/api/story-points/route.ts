@@ -3,13 +3,23 @@
  * 스토리 포인트 목록 반환 (gym 타입만 필터링)
  */
 import { NextRequest, NextResponse } from "next/server";
-import { loadStoryData } from "@/lib/data-loader";
+import { loadStoryData, isValidGameVersion } from "@/lib/data-loader";
 import { getApiErrorMessage } from "@/lib/api-error";
 import { withRateLimit } from "@/lib/rate-limit";
 
 export const GET = withRateLimit(async (request: NextRequest) => {
   try {
-    const storyPoints = loadStoryData();
+    const searchParams = request.nextUrl.searchParams;
+    const gameVersion = searchParams.get("gameVersion");
+
+    if (gameVersion !== null && !isValidGameVersion(gameVersion)) {
+      return NextResponse.json(
+        { error: "올바르지 않은 게임 버전입니다." },
+        { status: 400 },
+      );
+    }
+
+    const storyPoints = loadStoryData(gameVersion ?? undefined);
 
     // gym 타입만 필터링
     const gymPoints = storyPoints.filter((sp) => sp.type === "gym");

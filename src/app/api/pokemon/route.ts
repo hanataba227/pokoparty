@@ -3,7 +3,7 @@
  * 전체 포켓몬 목록 반환 API (게임 버전별 필터링 지원)
  */
 import { NextRequest, NextResponse } from "next/server";
-import { loadPokemonData } from "@/lib/data-loader";
+import { loadPokemonData, isValidGameVersion } from "@/lib/data-loader";
 import { getApiErrorMessage } from "@/lib/api-error";
 import { withRateLimit } from "@/lib/rate-limit";
 
@@ -12,6 +12,14 @@ export const GET = withRateLimit(async (request: NextRequest) => {
     const searchParams = request.nextUrl.searchParams;
     const gameVersion = searchParams.get("gameVersion");
     const fields = searchParams.get("fields");
+
+    if (gameVersion !== null && !isValidGameVersion(gameVersion)) {
+      return NextResponse.json(
+        { error: "올바르지 않은 게임 버전입니다." },
+        { status: 400 },
+      );
+    }
+
     const pokemon = loadPokemonData(gameVersion ?? undefined);
 
     if (fields === "slim") {

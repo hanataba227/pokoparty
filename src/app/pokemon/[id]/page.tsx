@@ -86,6 +86,13 @@ export default async function PokemonDetailPage({ params }: { params: Promise<{ 
     evolutions: p.evolutions,
   }));
 
+  // pokedex-all.json 기반 이름 맵 (게임 미수록 포켓몬 이름 fallback)
+  const pokedexAll = loadPokedex();
+  const nameMap: Record<number, string> = {};
+  for (const entry of pokedexAll) {
+    nameMap[entry.id] = entry.name;
+  }
+
   const spriteUrl = getSpriteUrl(pokemon.id);
 
   const generation = getGeneration(pokemon.id);
@@ -167,6 +174,7 @@ export default async function PokemonDetailPage({ params }: { params: Promise<{ 
                   evolutions={pokemon.evolutions}
                   currentPokemonId={pokemon.id}
                   allPokemon={allPokemonBrief}
+                  nameMap={nameMap}
                 />
               </div>
             </section>

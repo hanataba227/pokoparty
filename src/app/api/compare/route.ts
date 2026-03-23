@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { loadPokemonData, loadTypeChart } from "@/lib/data-loader";
+import { loadPokemonData, loadTypeChart, isValidGameVersion } from "@/lib/data-loader";
 import { getApiErrorMessage } from "@/lib/api-error";
 import { withRateLimit } from "@/lib/rate-limit";
 import { compareParties } from "@/lib/party-compare";
@@ -7,7 +7,7 @@ import { compareParties } from "@/lib/party-compare";
 export const POST = withRateLimit(async (request: NextRequest) => {
   try {
     const body = await request.json();
-    const { partyA, partyB } = body as { partyA: unknown; partyB: unknown };
+    const { partyA, partyB, gameVersion } = body as { partyA: unknown; partyB: unknown; gameVersion?: unknown };
 
     for (const [name, ids] of [["partyA", partyA], ["partyB", partyB]] as const) {
       if (!Array.isArray(ids) || ids.length === 0) {
@@ -16,9 +16,9 @@ export const POST = withRateLimit(async (request: NextRequest) => {
           { status: 400 },
         );
       }
-      if (ids.length > 7) {
+      if (ids.length > 6) {
         return NextResponse.json(
-          { error: `${name}는 최대 7마리까지 가능합니다.` },
+          { error: `${name}는 최대 6마리까지 가능합니다.` },
           { status: 400 },
         );
       }
@@ -39,7 +39,15 @@ export const POST = withRateLimit(async (request: NextRequest) => {
       }
     }
 
-    const allPokemon = loadPokemonData();
+    // gameVersion 검증
+    if (gameVersion !== undefined && (typeof gameVersion !== "string" || !isValidGameVersion(gameVersion))) {
+      return NextResponse.json(
+        { error: "올바르지 않은 게임 버전입니다." },
+        { status: 400 },
+      );
+    }
+
+    const allPokemon = loadPokemonData(gameVersion as string | undefined);
     const typeChart = loadTypeChart();
     const pokemonMap = new Map(allPokemon.map((p) => [p.id, p]));
 

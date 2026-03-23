@@ -15,7 +15,10 @@ export const GET = withRateLimit(async (request: NextRequest) => {
 
     if (error) {
       console.error('인기 포켓몬 DB 조회 오류:', error);
-      return NextResponse.json({ popular: [], source: 'empty' });
+      return NextResponse.json(
+        { error: '인기 포켓몬 데이터를 조회하는 중 오류가 발생했습니다.', popular: [], source: 'error' },
+        { status: 500 },
+      );
     }
 
     if (!data || data.length === 0) {
@@ -25,6 +28,9 @@ export const GET = withRateLimit(async (request: NextRequest) => {
     return NextResponse.json({ popular: data, source: 'database' });
   } catch (error) {
     console.error('인기 포켓몬 API 오류:', error);
-    return NextResponse.json({ popular: [], source: 'empty' });
+    return NextResponse.json(
+      { error: '인기 포켓몬 API 처리 중 오류가 발생했습니다.', popular: [], source: 'error' },
+      { status: 500 },
+    );
   }
 });

@@ -10,9 +10,13 @@ import { withRateLimit } from "@/lib/rate-limit";
 import { loadPokemonData, loadTypeChart, loadAllPokemonNames } from "@/lib/data-loader";
 import { analyzeParty } from "@/lib/party-analysis";
 import { getGameById } from "@/lib/game-data";
+import { GEN_RANGES } from "@/lib/pokemon-gen";
 
 /** 유저당 최대 저장 파티 수 */
 const MAX_PARTIES = 30;
+
+/** 포켓몬 ID 상한 (세대 범위에서 동적 산출) */
+const MAX_POKEMON_ID = GEN_RANGES[GEN_RANGES.length - 1][1];
 
 
 export const GET = withRateLimit(async (request: NextRequest) => {
@@ -136,7 +140,7 @@ export const POST = withRateLimit(async (request: NextRequest) => {
       );
     }
     for (const id of pokemon_ids) {
-      if (!Number.isInteger(id) || id < 1 || id > 1025) {
+      if (!Number.isInteger(id) || id < 1 || id > MAX_POKEMON_ID) {
         return NextResponse.json(
           { error: "올바르지 않은 포켓몬 ID가 포함되어 있습니다." },
           { status: 400 },

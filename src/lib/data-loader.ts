@@ -111,6 +111,20 @@ function cSet<T>(key: string, value: T): void {
   dataCache.set(key, value);
 }
 
+/** 동일 접두사 캐시 항목이 MAX_CACHE_VERSIONS개를 초과하면 가장 오래된 것을 제거 */
+const MAX_CACHE_VERSIONS = 5;
+function evictCacheIfNeeded(prefix: string): void {
+  const matchingKeys: string[] = [];
+  for (const key of dataCache.keys()) {
+    if (key.startsWith(prefix)) matchingKeys.push(key);
+  }
+  // Map은 삽입 순서를 보존하므로 앞쪽이 가장 오래된 항목
+  while (matchingKeys.length >= MAX_CACHE_VERSIONS) {
+    const oldest = matchingKeys.shift()!;
+    dataCache.delete(oldest);
+  }
+}
+
 export function loadAbilityScores(): Record<string, AbilityScoreEntry> {
   const cached = cGet<Record<string, AbilityScoreEntry>>("abilityScores");
   if (cached) return cached;
@@ -120,7 +134,13 @@ export function loadAbilityScores(): Record<string, AbilityScoreEntry> {
     return {};
   }
   const raw = fs.readFileSync(filePath, "utf-8");
-  const data = JSON.parse(raw) as AbilityScoresFile;
+  let data: AbilityScoresFile;
+  try {
+    data = JSON.parse(raw) as AbilityScoresFile;
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    throw new Error(`JSON 파싱 실패 (scoring/ability-scores.json): ${message}`);
+  }
   cSet("abilityScores", data.abilities);
   return data.abilities;
 }
@@ -141,7 +161,14 @@ function readJsonFile<T>(...segments: string[]): T {
     );
   }
   const raw = fs.readFileSync(filePath, "utf-8");
-  return JSON.parse(raw) as T;
+  try {
+    return JSON.parse(raw) as T;
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    throw new Error(
+      `JSON 파싱 실패 (${segments.join("/")}): ${message}`
+    );
+  }
 }
 
 function convertTypeToKo(typeEn: string): PokemonType {
@@ -231,8 +258,11 @@ function buildGameFileMap(): Record<string, GameFileMapping> {
 
     // story/gyms: storyGroup 기반 매핑
     const storyFiles = game.storyGroup ? STORY_FILE_PREFIX_MAP[game.storyGroup] : null;
-    const story = storyFiles?.story ?? 'gen8-sword-story.json';
-    const gyms = storyFiles?.gyms ?? 'gen8-sword-gyms.json';
+    if (!storyFiles) {
+      console.warn(`[data-loader] 게임 '${id}'에 대한 스토리 파일 매핑이 없습니다. storyGroup: ${game.storyGroup ?? 'undefined'}. 빈 스토리 데이터를 사용합니다.`);
+    }
+    const story = storyFiles?.story ?? '';
+    const gyms = storyFiles?.gyms ?? '';
 
     map[id] = { pokemon, story, gyms, encounters };
   }
@@ -307,9 +337,10 @@ interface RawPokemonFile {
  */
 export function loadPokemonData(gameVersion?: GameVersion): Pokemon[] {
   const filename = getPokemonJsonFilename(gameVersion);
+  const cacheKey = `pokemon:${filename}`;
 
-  const cached = cGet<Pokemon[]>("pokemon");
-  if (cached && cGet<string>("pokemonVersion") === filename) return cached;
+  const cached = cGet<Pokemon[]>(cacheKey);
+  if (cached) return cached;
 
   const raw = loadRawPokemonFile(gameVersion);
 
@@ -318,7 +349,7 @@ export function loadPokemonData(gameVersion?: GameVersion): Pokemon[] {
   for (const p of raw.pokemon) {
     if (p.name_en) nameEnToId.set(p.name_en.toLowerCase(), p.id);
   }
-  cSet("pokemonNameEnToId", nameEnToId);
+  cSet(`pokemonNameEnToId:${filename}`, nameEnToId);
 
   const result = raw.pokemon.map((p) => {
     const types = p.types.map(convertTypeToKo);
@@ -352,18 +383,19 @@ export function loadPokemonData(gameVersion?: GameVersion): Pokemon[] {
     return pokemon;
   });
 
-  cSet("pokemon", result);
-  cSet("pokemonVersion", filename);
+  evictCacheIfNeeded("pokemon:");
+  cSet(cacheKey, result);
   return result;
 }
 
 function loadRawPokemonFile(gameVersion?: GameVersion): RawPokemonFile {
   const filename = getPokemonJsonFilename(gameVersion);
-  const cached = cGet<RawPokemonFile>("rawPokemon");
-  if (cached && cGet<string>("rawPokemonVersion") === filename) return cached;
+  const cacheKey = `rawPokemon:${filename}`;
+  const cached = cGet<RawPokemonFile>(cacheKey);
+  if (cached) return cached;
   const result = readJsonFile<RawPokemonFile>("pokemon", filename);
-  cSet("rawPokemon", result);
-  cSet("rawPokemonVersion", filename);
+  evictCacheIfNeeded("rawPokemon:");
+  cSet(cacheKey, result);
   return result;
 }
 
@@ -374,9 +406,10 @@ function loadRawPokemonFile(gameVersion?: GameVersion): RawPokemonFile {
  */
 export function loadMovesData(gameVersion?: GameVersion): Map<number, Move[]> {
   const filename = getPokemonJsonFilename(gameVersion);
+  const cacheKey = `moves:${filename}`;
 
-  const cached = cGet<Map<number, Move[]>>("moves");
-  if (cached && cGet<string>("movesVersion") === filename) return cached;
+  const cached = cGet<Map<number, Move[]>>(cacheKey);
+  if (cached) return cached;
 
   const raw = loadRawPokemonFile(gameVersion);
 
@@ -397,8 +430,8 @@ export function loadMovesData(gameVersion?: GameVersion): Map<number, Move[]> {
     result.set(p.id, moves);
   }
 
-  cSet("moves", result);
-  cSet("movesVersion", filename);
+  evictCacheIfNeeded("moves:");
+  cSet(cacheKey, result);
   return result;
 }
 
@@ -482,7 +515,8 @@ function buildGymByOrderMap(gymRaw: RawStoryGymFile): Map<number, RawGymEntry[]>
 /** 체육관 섹션 → StoryPoint 변환 (매칭 시 반환, 미매칭 시 null) */
 function tryParseGymStoryPoint(
   sp: RawStoryPoint,
-  gymByOrder: Map<number, RawGymEntry[]>
+  gymByOrder: Map<number, RawGymEntry[]>,
+  gameId: string
 ): StoryPoint | null {
   if (!sp.section.includes("체육관")) return null;
   if (sp.type !== "town" && sp.type !== "city") return null;
@@ -498,7 +532,7 @@ function tryParseGymStoryPoint(
   const bossLevel = Math.max(...gym.pokemon.map((p) => p.level));
   return {
     id: `gym-${gymOrder}-${sp.location_id}`,
-    gameId: "sword-shield",
+    gameId,
     order: sp.order,
     type: "gym" as StoryPointType,
     bossType: [convertTypeToKo(gym.type)],
@@ -508,24 +542,36 @@ function tryParseGymStoryPoint(
 }
 
 /** 챔피언 섹션 → StoryPoint 변환 (매칭 시 반환, 미매칭 시 null) */
-function tryParseChampionStoryPoint(sp: RawStoryPoint): StoryPoint | null {
+function tryParseChampionStoryPoint(
+  sp: RawStoryPoint,
+  gymRaw: RawStoryGymFile,
+  gameId: string
+): StoryPoint | null {
   if (!sp.section.includes("챔피언") || sp.type !== "city") return null;
+
+  // 챔피언 정보를 gyms JSON에서 동적으로 읽기
+  let bossType: PokemonType[] = [];
+  let bossLevel = 0;
+  if (gymRaw.champion) {
+    bossLevel = Math.max(...gymRaw.champion.pokemon.map((p) => p.level), 0);
+  }
+
   return {
     id: `champion-${sp.location_id}`,
-    gameId: "sword-shield",
+    gameId,
     order: sp.order,
     type: "champion" as StoryPointType,
-    bossType: ["격투" as PokemonType],
-    bossLevel: 65,
+    bossType,
+    bossLevel,
     name: `${sp.location_name} 챔피언컵`,
   };
 }
 
 /** 일반 스토리 포인트 생성 */
-function createGenericStoryPoint(sp: RawStoryPoint): StoryPoint {
+function createGenericStoryPoint(sp: RawStoryPoint, gameId: string): StoryPoint {
   return {
     id: sp.location_id,
-    gameId: "sword-shield",
+    gameId,
     order: sp.order,
     type: "rival" as StoryPointType,
     bossType: [],
@@ -536,13 +582,22 @@ function createGenericStoryPoint(sp: RawStoryPoint): StoryPoint {
 
 function loadRawStoryFile(gameId?: string): RawStoryFile {
   const files = getGameFiles(gameId);
-  const cacheKey = files.story;
-  const cached = cGet<RawStoryFile>("rawStory");
-  if (cached && cGet<string>("rawStoryVersion") === cacheKey) return cached;
-  const result = readJsonFile<RawStoryFile>("story", files.story);
-  cSet("rawStory", result);
-  cSet("rawStoryVersion", cacheKey);
-  return result;
+  if (!files.story) {
+    console.warn(`[data-loader] 게임 '${gameId ?? "unknown"}'에 대한 스토리 파일이 없습니다. 빈 스토리 데이터를 반환합니다.`);
+    return { story_points: [] };
+  }
+  const cacheKey = `rawStory:${files.story}`;
+  const cached = cGet<RawStoryFile>(cacheKey);
+  if (cached) return cached;
+  try {
+    const result = readJsonFile<RawStoryFile>("story", files.story);
+    evictCacheIfNeeded("rawStory:");
+    cSet(cacheKey, result);
+    return result;
+  } catch (e) {
+    console.warn(`[data-loader] 게임 '${gameId ?? "unknown"}'의 스토리 데이터 로드 실패 (${files.story}): ${e instanceof Error ? e.message : String(e)}`);
+    return { story_points: [] };
+  }
 }
 
 /**
@@ -552,28 +607,36 @@ function loadRawStoryFile(gameId?: string): RawStoryFile {
  */
 export function loadStoryData(gameId?: string): StoryPoint[] {
   const files = getGameFiles(gameId);
-  const cacheKey = files.story;
-  const cached = cGet<StoryPoint[]>("storyPoints");
-  if (cached && cGet<string>("storyVersion") === cacheKey) return cached;
+  const storyCacheKey = `storyPoints:${files.story || 'empty'}`;
+  const cached = cGet<StoryPoint[]>(storyCacheKey);
+  if (cached) return cached;
 
   const storyRaw = loadRawStoryFile(gameId);
-  const gymRaw = readJsonFile<RawStoryGymFile>("story", files.gyms);
+  let gymRaw: RawStoryGymFile = {};
+  if (files.gyms) {
+    try {
+      gymRaw = readJsonFile<RawStoryGymFile>("story", files.gyms);
+    } catch (e) {
+      console.warn(`[data-loader] 게임 '${gameId ?? "unknown"}'의 체육관 데이터 로드 실패 (${files.gyms}): ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
   const gymByOrder = buildGymByOrderMap(gymRaw);
 
+  const resolvedGameId = gameId ?? "sword";
   const storyPoints: StoryPoint[] = [];
 
   for (const sp of storyRaw.story_points) {
-    const gymPoint = tryParseGymStoryPoint(sp, gymByOrder);
+    const gymPoint = tryParseGymStoryPoint(sp, gymByOrder, resolvedGameId);
     if (gymPoint) { storyPoints.push(gymPoint); continue; }
 
-    const champPoint = tryParseChampionStoryPoint(sp);
+    const champPoint = tryParseChampionStoryPoint(sp, gymRaw, resolvedGameId);
     if (champPoint) { storyPoints.push(champPoint); continue; }
 
-    storyPoints.push(createGenericStoryPoint(sp));
+    storyPoints.push(createGenericStoryPoint(sp, resolvedGameId));
   }
 
-  cSet("storyPoints", storyPoints);
-  cSet("storyVersion", cacheKey);
+  evictCacheIfNeeded("storyPoints:");
+  cSet(storyCacheKey, storyPoints);
   return storyPoints;
 }
 
@@ -677,15 +740,16 @@ function normalizeEncounterName(nameEn: string): string {
  */
 export function loadEncounters(gameId?: string): Encounter[] {
   const files = getGameFiles(gameId);
-  const cacheKey = files.encounters;
-  const cachedEnc = cGet<Encounter[]>("encounters");
-  if (cachedEnc && cGet<string>("encountersVersion") === cacheKey) return cachedEnc;
+  const encCacheKey = `encounters:${files.encounters}`;
+  const cachedEnc = cGet<Encounter[]>(encCacheKey);
+  if (cachedEnc) return cachedEnc;
 
   const raw = readJsonFile<RawEncounterFile>("encounter", files.encounters);
   loadPokemonData(gameId); // 캐시 보장 (해당 게임 버전의 포켓몬 데이터)
 
   // loadPokemonData에서 구축된 name_en -> id 캐시 재사용 (중복 파싱 방지)
-  const nameToId = cGet<Map<string, number>>("pokemonNameEnToId") ?? new Map<string, number>();
+  const pokemonFilename = getPokemonJsonFilename(gameId);
+  const nameToId = cGet<Map<string, number>>(`pokemonNameEnToId:${pokemonFilename}`) ?? new Map<string, number>();
 
   const encounters: Encounter[] = [];
 
@@ -730,8 +794,8 @@ export function loadEncounters(gameId?: string): Encounter[] {
     }
   }
 
-  cSet("encounters", encounters);
-  cSet("encountersVersion", cacheKey);
+  evictCacheIfNeeded("encounters:");
+  cSet(encCacheKey, encounters);
   return encounters;
 }
 
@@ -865,7 +929,8 @@ export function findGameVersionForPokemon(pokemonId: number): string | undefined
         cSet("pokemonIdToGame", map);
         return game.id;
       }
-    } catch {
+    } catch (e) {
+      console.warn(`[data-loader] 게임 '${game.id}' 포켓몬 데이터 로드 실패: ${e instanceof Error ? e.message : String(e)}`);
       continue;
     }
   }
@@ -913,7 +978,8 @@ export function loadAllPokemonNames(): Map<number, string> {
           nameMap.set(p.id, p.name_ko || p.name);
         }
       }
-    } catch {
+    } catch (e) {
+      console.warn(`[data-loader] 포켓몬 이름 데이터 로드 실패 (${file}): ${e instanceof Error ? e.message : String(e)}`);
       continue;
     }
   }
