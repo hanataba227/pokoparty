@@ -256,9 +256,9 @@ function buildEarliestMap(allPokemon: Pokemon[], ctx: ScoringContext): Map<numbe
 // ========================================
 
 export function clearScoringCache(): void {
-  // 전역 상태가 제거되어 더 이상 캐시 초기화가 필요 없음.
-  // 캐시는 ScoringContext에 바인딩되어 요청 단위로 자동 관리됨.
-  // 외부 호출 호환성을 위해 함수 시그니처는 유지.
+  // DEFAULT_CTX의 캐시를 초기화 (테스트에서 개별 함수 직접 호출 시 사용)
+  DEFAULT_CTX.earliestMapCache = null;
+  DEFAULT_CTX.preEvoMapCache = null;
 }
 
 /** 현재 게임의 총 스토리 포인트 수 (동적) */

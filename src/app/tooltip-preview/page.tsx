@@ -4,11 +4,11 @@ import { useState } from 'react';
 import { HelpCircle, Info } from 'lucide-react';
 
 const SCORE_ITEMS = [
-  { key: 'combatFitness', label: '전투적합도', value: 72, desc: '스탯 집중도, 스피드, 기술 매칭을 종합한 전투 능력' },
-  { key: 'acquisition', label: '입수시기', value: 85, desc: '게임 초반에 얻을수록 높은 점수. 일찍 합류하면 키울 시간이 많아 유리' },
-  { key: 'stabPower', label: '자속화력', value: 68, desc: '자신의 타입과 같은 기술(STAB)의 위력. 높을수록 강한 공격 가능' },
-  { key: 'moveCoverage', label: '기술폭', value: 55, desc: '다양한 타입의 적을 상대할 수 있는 기술 커버리지' },
-  { key: 'evolutionEase', label: '진화용이성', value: 90, desc: '최종 진화까지의 난이도. 레벨 진화는 쉽고, 통신 교환은 어려움' },
+  { key: 'combatFitness', label: '전투적합도', value: 72, desc: '종족값 분포, 스피드, 기술 분포를 종합한 전투 능력' },
+  { key: 'acquisition', label: '입수시기', value: 85, desc: '게임 초반에 얻을수록 높은 점수' },
+  { key: 'stabPower', label: '자속화력', value: 68, desc: '종족값 분포에 맞는 기술을 배울 수 있으면 높은 점수' },
+  { key: 'moveCoverage', label: '기술폭', value: 55, desc: '다양한 타입의 적을 상대할 수 있으면 높은 점수' },
+  { key: 'evolutionEase', label: '진화용이성', value: 90, desc: '최종 진화까지의 난이도. 레벨 진화, 통신 교환 등' },
 ];
 
 export default function TooltipPreviewPage() {

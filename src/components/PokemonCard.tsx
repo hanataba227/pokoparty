@@ -12,11 +12,11 @@ import { UI } from '@/lib/ui-tokens';
 
 /** 점수 항목 설명 */
 const SCORE_DESCRIPTIONS: Record<string, string> = {
-  combatFitness: '스탯 집중도, 스피드, 기술 매칭을 종합한 전투 능력',
-  acquisition: '게임 초반에 얻을수록 높은 점수. 일찍 합류하면 키울 시간이 많아 유리',
-  stabPower: '자신의 타입과 같은 기술(STAB)의 위력. 높을수록 강한 공격 가능',
-  moveCoverage: '다양한 타입의 적을 상대할 수 있는 기술 커버리지',
-  evolutionEase: '최종 진화까지의 난이도. 레벨 진화는 쉽고, 통신 교환은 어려움',
+  combatFitness: '종족값 분포, 스피드, 기술 분포를 종합한 전투 능력',
+  acquisition: '게임 초반에 얻을수록 높은 점수',
+  stabPower: '종족값 분포에 맞는 기술을 배울 수 있으면 높은 점수',
+  moveCoverage: '다양한 타입의 적을 상대할 수 있으면 높은 점수',
+  evolutionEase: '최종 진화까지의 난이도. 레벨 진화, 통신 교환 등',
 };
 
 /** 카테고리별 아이콘/라벨 매핑 */

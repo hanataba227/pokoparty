@@ -53,11 +53,13 @@ export default function EvolutionTree({
     allPokemon.find((p) => p.id === id)?.evolutions;
 
   // 기저 포켓몬(1단계) 찾기: 누가 현재 포켓몬으로 진화하는지 역추적
-  function findBaseId(targetId: number): number {
+  function findBaseId(targetId: number, visited = new Set<number>()): number {
+    if (visited.has(targetId)) return targetId; // 순환 참조 방어
+    visited.add(targetId);
     const preEvo = allPokemon.find((p) =>
       p.evolutions?.some((e) => e.to === targetId)
     );
-    if (preEvo) return findBaseId(preEvo.id);
+    if (preEvo) return findBaseId(preEvo.id, visited);
     return targetId;
   }
 
