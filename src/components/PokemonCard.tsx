@@ -7,17 +7,7 @@ import type { Pokemon, ScoringBreakdown, DetailedReason } from '@/types/pokemon'
 import { getFinalScore } from '@/lib/score-utils';
 import { getSpriteUrl } from '@/lib/sprite';
 import TypeBadge from './TypeBadge';
-import { HelpCircle } from 'lucide-react';
 import { UI } from '@/lib/ui-tokens';
-
-/** 점수 항목 설명 */
-const SCORE_DESCRIPTIONS: Record<string, string> = {
-  combatFitness: '종족값 분포, 스피드, 기술 분포를 종합한 전투 능력',
-  acquisition: '게임 초반에 얻을수록 높은 점수',
-  stabPower: '종족값 분포에 맞는 기술을 배울 수 있으면 높은 점수',
-  moveCoverage: '다양한 타입의 적을 상대할 수 있으면 높은 점수',
-  evolutionEase: '최종 진화까지의 난이도. 레벨 진화, 통신 교환 등',
-};
 
 /** 카테고리별 아이콘/라벨 매핑 */
 const REASON_LABELS: Record<DetailedReason['category'], { icon: string; label: string }> = {
@@ -122,33 +112,26 @@ const PokemonCard = memo(function PokemonCard({ pokemon, score, detailedReasons,
               <span className="text-slate-400 text-xs">/ 100</span>
             </div>
             <div className="space-y-1 text-[11px] text-slate-500">
-              {([
-                { key: 'combatFitness', label: '전투적합도', value: score.combatFitness },
-                { key: 'acquisition', label: '입수시기', value: score.acquisition },
-                { key: 'stabPower', label: '자속화력', value: score.stabPower },
-                { key: 'moveCoverage', label: '기술폭', value: score.moveCoverage },
-                { key: 'evolutionEase', label: '진화용이성', value: score.evolutionEase },
-              ] as const).map((item) => (
-                <div key={item.key} className="flex justify-between items-center">
-                  <span className="flex items-center gap-1">
-                    {item.label}
-                    <span className="relative group/tip">
-                      <HelpCircle className="w-3 h-3 text-slate-300 hover:text-indigo-500 transition-colors cursor-help" />
-                      <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5
-                        hidden group-hover/tip:block
-                        w-44 px-2.5 py-2 rounded-lg
-                        bg-slate-800 text-white text-[10px] leading-relaxed font-normal
-                        shadow-lg z-50 pointer-events-none">
-                        {SCORE_DESCRIPTIONS[item.key]}
-                        <span className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0
-                          border-l-4 border-r-4 border-t-4
-                          border-l-transparent border-r-transparent border-t-slate-800" />
-                      </span>
-                    </span>
-                  </span>
-                  <span className="font-medium">{item.value}</span>
-                </div>
-              ))}
+              <div className="flex justify-between">
+                <span>전투적합도</span>
+                <span className="font-medium">{score.combatFitness}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>입수시기</span>
+                <span className="font-medium">{score.acquisition}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>자속화력</span>
+                <span className="font-medium">{score.stabPower}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>기술폭</span>
+                <span className="font-medium">{score.moveCoverage}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>진화용이성</span>
+                <span className="font-medium">{score.evolutionEase}</span>
+              </div>
             </div>
 
             {/* 상세 추천 이유 (진화/팁만 표시) */}
