@@ -24,7 +24,7 @@ const SCORE_DESCRIPTIONS: Record<string, string> = {
   acquisition: '게임 초반에 얻을수록 높은 점수',
   stabPower: '종족값 분포에 맞는 기술을 배울 수 있으면 높은 점수',
   moveCoverage: '다양한 타입의 적을 상대할 수 있으면 높은 점수',
-  evolutionEase: '최종 진화까지의 난이도. 레벨 진화, 통신 교환 등',
+  evolutionEase: '레벨 진화, 통신 교환 등 최종 진화까지의 난이도',
 };
 
 const SCORE_ITEMS = [

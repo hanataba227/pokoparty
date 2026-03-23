@@ -8,7 +8,7 @@ const SCORE_ITEMS = [
   { key: 'acquisition', label: '입수시기', value: 85, desc: '게임 초반에 얻을수록 높은 점수' },
   { key: 'stabPower', label: '자속화력', value: 68, desc: '종족값 분포에 맞는 기술을 배울 수 있으면 높은 점수' },
   { key: 'moveCoverage', label: '기술폭', value: 55, desc: '다양한 타입의 적을 상대할 수 있으면 높은 점수' },
-  { key: 'evolutionEase', label: '진화용이성', value: 90, desc: '최종 진화까지의 난이도. 레벨 진화, 통신 교환 등' },
+  { key: 'evolutionEase', label: '진화용이성', value: 90, desc: '레벨 진화, 통신 교환 등 최종 진화까지의 난이도' },
 ];
 
 export default function TooltipPreviewPage() {

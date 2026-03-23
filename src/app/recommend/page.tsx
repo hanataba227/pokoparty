@@ -5,7 +5,9 @@ import PartySlot from '@/components/PartySlot';
 import PokemonSearchModal from '@/components/PokemonSearchModal';
 import PokemonCard from '@/components/PokemonCard';
 import GameSelector from '@/components/GameSelector';
-import { Loader2, ChevronLeft, ChevronRight, ChevronDown, SkipForward, Save, LogIn, SlidersHorizontal, Filter, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
+import { Loader2, ChevronLeft, ChevronRight, ChevronDown, SkipForward, Save, LogIn, SlidersHorizontal, Filter, RefreshCw, Info } from 'lucide-react';
+import ScoreGuideModal from '@/components/ScoreGuideModal';
 import { TYPE_COLORS } from '@/components/TypeBadge';
 import { UI } from '@/lib/ui-tokens';
 import { ALL_TYPES } from '@/lib/type-calc';
@@ -15,6 +17,7 @@ import { useRecommendState } from '@/hooks/useRecommendState';
 const STEPS = ['게임 선택', '고정 포켓몬', '추천 결과'];
 
 export default function RecommendPage() {
+  const [guideOpen, setGuideOpen] = useState(false);
   const {
     currentStep,
     setCurrentStep,
@@ -59,6 +62,7 @@ export default function RecommendPage() {
 
   return (
     <div className={`min-h-screen ${UI.pageBg}`}>
+      <ScoreGuideModal open={guideOpen} onClose={() => setGuideOpen(false)} />
       <div className="max-w-6xl mx-auto px-4 py-8 sm:py-12">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-slate-900">
@@ -293,6 +297,14 @@ export default function RecommendPage() {
                     </div>
 
                     <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setGuideOpen(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer
+                          text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                      >
+                        <Info className="w-3.5 h-3.5" />
+                        항목 안내
+                      </button>
                       <button
                         onClick={() => setActivePartyIndex((i: number) => Math.max(0, i - 1))}
                         disabled={activePartyIndex === 0}
