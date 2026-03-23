@@ -11,6 +11,7 @@ const navLinks = [
   { href: '/recommend', label: '파티 추천' },
   { href: '/analyze', label: '파티 분석' },
   { href: '/compare', label: '파티 비교' },
+  { href: '/community', label: '커뮤니티' },
   { href: '/pokedex', label: '포켓몬 도감' },
 ];
 

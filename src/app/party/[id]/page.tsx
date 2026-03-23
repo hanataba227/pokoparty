@@ -21,6 +21,7 @@ interface PartyDetailResponse {
     story_point_id: string | null;
     created_at: string;
     memo: string;
+    source?: string;
   };
   analysis: {
     grade: string;
@@ -103,6 +104,22 @@ export default function PartyDetailPage() {
     if (partyId) fetchDetail();
   }, [partyId, router]);
 
+  // 파티명 변경
+  const handleNameChange = useCallback(async (newName: string) => {
+    const res = await fetch(`/api/parties/${partyId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName }),
+    });
+    if (!res.ok) {
+      throw new Error('이름 변경에 실패했습니다.');
+    }
+    setData((prev) => prev ? {
+      ...prev,
+      party: { ...prev.party, name: newName },
+    } : prev);
+  }, [partyId]);
+
   // 삭제 처리
   const handleDelete = useCallback(async () => {
     if (deleting) return;
@@ -182,6 +199,8 @@ export default function PartyDetailPage() {
               totalScore={data.analysis?.total_score ?? 0}
               gameId={data.party.game_id}
               createdAt={data.party.created_at}
+              source={data.party.source}
+              onNameChange={handleNameChange}
             />
 
             <PartyPokemonGrid pokemonDetails={data.pokemon_details} />

@@ -173,8 +173,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       }
     }
 
+    // 공유 여부 확인
+    const { data: existingShare } = await supabase
+      .from("shared_parties")
+      .select("id")
+      .eq("source_party_id", id)
+      .eq("user_id", user.id)
+      .limit(1)
+      .maybeSingle();
+
     return NextResponse.json({
-      party,
+      party: { ...party, is_shared: !!existingShare },
       analysis,
       pokemon_details: pokemonDetails,
     });

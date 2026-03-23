@@ -44,12 +44,22 @@ function SignupContent() {
     setError('');
     setLoading(true);
     try {
+      // 이메일 중복 확인 (Google OAuth 등 기존 계정 감지)
+      const checkRes = await fetch(`/api/account/check-email?email=${encodeURIComponent(data.email)}`);
+      const checkData = await checkRes.json();
+      if (checkRes.ok && !checkData.available) {
+        setError(checkData.message || '이미 가입된 이메일입니다.');
+        setLoading(false);
+        return;
+      }
+
       const supabase = createBrowserSupabase();
       const { error: authError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
         options: {
           data: { display_name: data.displayName },
+          emailRedirectTo: `${window.location.origin}/auth/callback?mode=signup`,
         },
       });
       if (authError) {

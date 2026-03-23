@@ -1,6 +1,6 @@
 /**
  * POST /api/shared — 파티 공유 (스냅샷 생성)
- * GET  /api/shared — 갤러리 목록 (페이지네이션, 최신순)
+ * GET  /api/shared — 갤러리 목록 (페이지네이션, 정렬, 필터)
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
@@ -11,6 +11,14 @@ import { loadAllPokemonNames } from "@/lib/data-loader";
 
 /** 유저당 최대 공유 파티 수 */
 const MAX_SHARED_PARTIES = 10;
+
+/** 허용되는 정렬 옵션 */
+const SORT_OPTIONS: Record<string, { column: string; ascending: boolean }> = {
+  recent: { column: "shared_at", ascending: false },
+  likes: { column: "like_count", ascending: false },
+  saves: { column: "save_count", ascending: false },
+  score: { column: "total_score", ascending: false },
+};
 
 export const GET = withRateLimit(async (request: NextRequest) => {
   try {
@@ -25,12 +33,56 @@ export const GET = withRateLimit(async (request: NextRequest) => {
     );
     const offset = (page - 1) * pageSize;
 
-    // 최신순 조회 + 전체 개수
-    const { data: sharedParties, count, error: fetchError } = await supabase
+    // 정렬 파라미터
+    const sortKey = searchParams.get("sort") ?? "recent";
+    const sortOption = SORT_OPTIONS[sortKey] ?? SORT_OPTIONS.recent;
+
+    // 쿼리 빌드
+    let query = supabase
       .from("shared_parties")
-      .select("*", { count: "exact" })
-      .order("shared_at", { ascending: false })
+      .select("*", { count: "exact" });
+
+    // --- 필터 적용 ---
+
+    // q: 파티명 검색 (ILIKE)
+    const q = searchParams.get("q");
+    if (q && q.trim().length > 0) {
+      query = query.ilike("party_name", `%${q.trim()}%`);
+    }
+
+    // pokemon: 포켓몬 ID 포함 필터 (contains)
+    const pokemonFilter = searchParams.get("pokemon");
+    if (pokemonFilter) {
+      const pokemonIds = pokemonFilter
+        .split(",")
+        .map((s) => parseInt(s.trim(), 10))
+        .filter((n) => !isNaN(n) && n > 0);
+      if (pokemonIds.length > 0) {
+        query = query.contains("pokemon_ids", pokemonIds);
+      }
+    }
+
+    // grade: 등급 필터 (in)
+    const gradeFilter = searchParams.get("grade");
+    if (gradeFilter) {
+      const grades = gradeFilter.split(",").map((s) => s.trim()).filter(Boolean);
+      if (grades.length > 0) {
+        query = query.in("grade", grades);
+      }
+    }
+
+    // game: 게임 필터 (eq)
+    const gameFilter = searchParams.get("game");
+    if (gameFilter && gameFilter.trim().length > 0) {
+      query = query.eq("game_id", gameFilter.trim());
+    }
+
+    // 정렬 + 페이지네이션
+    query = query
+      .order(sortOption.column, { ascending: sortOption.ascending })
       .range(offset, offset + pageSize - 1);
+
+    const { data: sharedParties, count, error: fetchError } = await query;
 
     if (fetchError) {
       console.error("공유 파티 목록 조회 오류:", fetchError);
@@ -40,13 +92,41 @@ export const GET = withRateLimit(async (request: NextRequest) => {
       );
     }
 
+    // 로그인 유저 확인 (선택적 — 실패해도 무시)
+    let currentUserId: string | null = null;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      currentUserId = user?.id ?? null;
+    } catch {
+      // 비로그인 — 무시
+    }
+
+    // 로그인 유저의 좋아요 목록 조회
+    let likedSet = new Set<string>();
+    if (currentUserId && sharedParties && sharedParties.length > 0) {
+      const partyIds = sharedParties.map((p) => p.id);
+      const { data: likes } = await supabase
+        .from("shared_party_likes")
+        .select("shared_party_id")
+        .eq("user_id", currentUserId)
+        .in("shared_party_id", partyIds);
+
+      if (likes) {
+        likedSet = new Set(likes.map((l) => l.shared_party_id));
+      }
+    }
+
     // 포켓몬 이름 맵 (갤러리 카드 표시용)
     const allNames = loadAllPokemonNames();
     const partiesWithNames = (sharedParties ?? []).map((party) => {
       const pokemonNames = (party.pokemon_ids as number[]).map(
         (id) => allNames.get(id) ?? `#${id}`,
       );
-      return { ...party, pokemon_names: pokemonNames };
+      return {
+        ...party,
+        pokemon_names: pokemonNames,
+        is_liked: likedSet.has(party.id),
+      };
     });
 
     return NextResponse.json({

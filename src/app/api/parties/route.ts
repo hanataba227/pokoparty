@@ -196,8 +196,14 @@ export const POST = withRateLimit(async (request: NextRequest) => {
       );
     }
 
-    // game_id 검증 — game-data.ts의 게임 목록과 동기화
-    if (typeof game_id !== "string" || !getGameById(game_id)) {
+    // game_id 검증 — 빈 문자열 허용 (분석 페이지 등 게임 미지정 시), 값이 있으면 유효성 검사
+    if (typeof game_id !== "string") {
+      return NextResponse.json(
+        { error: "올바르지 않은 게임 ID입니다." },
+        { status: 400 },
+      );
+    }
+    if (game_id !== "" && !getGameById(game_id)) {
       return NextResponse.json(
         { error: "올바르지 않은 게임 ID입니다." },
         { status: 400 },

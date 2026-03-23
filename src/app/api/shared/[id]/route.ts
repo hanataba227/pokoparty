@@ -62,8 +62,28 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       };
     });
 
+    // 로그인 유저 확인 (선택적 — 실패해도 무시)
+    let isLiked = false;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: like } = await supabase
+          .from("shared_party_likes")
+          .select("shared_party_id")
+          .eq("shared_party_id", id)
+          .eq("user_id", user.id)
+          .single();
+        isLiked = !!like;
+      }
+    } catch {
+      // 비로그인 — 무시
+    }
+
     return NextResponse.json({
-      shared,
+      party: {
+        ...shared,
+        is_liked: isLiked,
+      },
       pokemon_details: pokemonDetails,
     });
   } catch (error) {

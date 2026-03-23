@@ -8,7 +8,7 @@ import PokemonSearchModal from '@/components/PokemonSearchModal';
 import CompareResultTable from '@/components/CompareResultTable';
 import CompareDetailPanel from '@/components/CompareDetailPanel';
 import CompareHighlights from '@/components/CompareHighlights';
-import { Loader2, Swords, FolderOpen } from 'lucide-react';
+import { Loader2, Swords } from 'lucide-react';
 import { UI } from '@/lib/ui-tokens';
 import { cachedFetch } from '@/lib/client-cache';
 import { useAuth } from '@/contexts/AuthContext';
@@ -221,9 +221,7 @@ function CompareContent() {
         >
           {partyLoading ? (
             <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <FolderOpen className="w-4 h-4" />
-          )}
+          ) : null}
           내 파티
         </button>
 

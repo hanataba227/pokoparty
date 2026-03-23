@@ -6,12 +6,15 @@ import Link from 'next/link';
 import { ArrowLeft, User } from 'lucide-react';
 import PartyPokemonGrid from '@/components/PartyPokemonGrid';
 import PartyAnalysisView from '@/components/PartyAnalysisView';
+import ImportPartyButton from '@/components/ImportPartyButton';
+import LikeButton from '@/components/LikeButton';
 import type { SharedPartyDetailResponse } from '@/types/shared-party';
 import type { PartyGrade } from '@/types/pokemon';
-import { getGradeColor, getGradeBgColor, getGradeLabel } from '@/lib/party-grade';
+import { getGradeColor, getGradeBgColor } from '@/lib/party-grade';
 import { getGameById } from '@/lib/game-data';
 import { UI } from '@/lib/ui-tokens';
 import { getClientErrorMessage } from '@/lib/error-utils';
+import { useAuth } from '@/contexts/AuthContext';
 
 /** 스켈레톤 UI */
 function DetailSkeleton() {
@@ -39,6 +42,7 @@ function DetailSkeleton() {
 export default function SharedPartyDetailPage() {
   const params = useParams();
   const sharedId = params.id as string;
+  const { user } = useAuth();
 
   const [data, setData] = useState<SharedPartyDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -81,6 +85,9 @@ export default function SharedPartyDetailPage() {
       }).replace(/\. /g, '.').replace(/\.$/, '')
     : '';
 
+  // 본인이 공유한 파티인지 확인
+  const isOwnParty = user && party?.user_id === user.id;
+
   return (
     <div className={`min-h-screen ${UI.pageBg}`}>
       <div className="max-w-2xl mx-auto px-4 py-8">
@@ -122,16 +129,23 @@ export default function SharedPartyDetailPage() {
                   <div className={`${getGradeBgColor(grade)} ${getGradeColor(grade)} px-3 py-2 rounded-xl text-center flex-shrink-0`}>
                     <div className="text-2xl font-black leading-none">{grade}</div>
                     <div className="text-xs opacity-75 mt-1">
-                      {Math.round(party.total_score)}점 · {getGradeLabel(grade)}
+                      {Math.round(party.total_score)}점
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* 작성자 정보 */}
-              <div className="mt-3 flex items-center gap-2 text-sm text-slate-600">
-                <User className="w-4 h-4 text-slate-400" />
-                <span>{party.display_name}</span>
+              {/* 작성자 정보 + 좋아요 */}
+              <div className="mt-3 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm text-slate-600">
+                  <User className="w-4 h-4 text-slate-400" />
+                  <span>{party.display_name}</span>
+                </div>
+                <LikeButton
+                  sharedPartyId={party.id}
+                  initialLiked={party.is_liked === true}
+                  initialCount={party.like_count ?? 0}
+                />
               </div>
             </div>
 
@@ -161,6 +175,15 @@ export default function SharedPartyDetailPage() {
                   {party.memo}
                 </p>
               </div>
+            )}
+
+            {/* 내 파티에 저장하기 — 로그인 유저 + 본인 파티가 아닌 경우 */}
+            {user && !isOwnParty && (
+              <ImportPartyButton
+                sharedPartyId={party.id}
+                originalGameId={party.game_id}
+                isImported={party.is_imported === true}
+              />
             )}
           </>
         )}

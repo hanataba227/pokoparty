@@ -24,6 +24,14 @@ export interface SharedParty {
   resistances: string[];
   display_name: string;
   shared_at: string;
+  /** 좋아요 수 (비정규화) */
+  like_count?: number;
+  /** 저장 횟수 (비정규화) */
+  save_count?: number;
+  /** 현재 유저가 좋아요 했는지 */
+  is_liked?: boolean;
+  /** 현재 유저가 이미 저장했는지 */
+  is_imported?: boolean;
 }
 
 /** 갤러리 목록 API 응답 */

@@ -1,7 +1,7 @@
 'use client';
 
 import type { PartyGrade, PokemonType } from '@/types/pokemon';
-import { getGradeColor, getGradeLabel } from '@/lib/party-grade';
+import { getGradeColor } from '@/lib/party-grade';
 import TypeBadge from '@/components/TypeBadge';
 import { Lightbulb } from 'lucide-react';
 import { UI } from '@/lib/ui-tokens';
@@ -57,45 +57,42 @@ export default function PartyAnalysisView({ analysis }: PartyAnalysisViewProps) 
 
   return (
     <div className="space-y-4 mb-6">
-      {/* 타입 커버리지 / 약점 / 내성 */}
-      <div className={`${UI.pageBg} ${UI.border} p-4`}>
-        <h2 className={UI.sectionTitle}>타입 분석</h2>
-        <div className="space-y-4">
-          {/* 커버리지 */}
-          <div>
-            <h3 className="text-sm font-semibold text-slate-700 mb-2">공격 커버리지</h3>
-            <TypeTagList types={analysis.coverage} emptyText="커버리지 타입이 없습니다." />
-          </div>
-
-          {/* 약점 */}
-          <div>
-            <h3 className="text-sm font-semibold text-red-600 mb-2">약점</h3>
-            <TypeTagList types={analysis.weaknesses} emptyText="뚜렷한 약점이 없습니다." />
-          </div>
-
-          {/* 내성 */}
-          <div>
-            <h3 className="text-sm font-semibold text-blue-600 mb-2">내성</h3>
-            <TypeTagList types={analysis.resistances} emptyText="뚜렷한 내성이 없습니다." />
+      {/* 타입 분석 + 점수 상세: 좌우 2컬럼 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* 왼쪽: 타입 커버리지 / 약점 / 내성 */}
+        <div className={`${UI.pageBg} ${UI.border} p-4`}>
+          <h2 className={UI.sectionTitle}>타입 분석</h2>
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-700 mb-2">공격 커버리지</h3>
+              <TypeTagList types={analysis.coverage} emptyText="커버리지 타입이 없습니다." />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-red-600 mb-2">약점</h3>
+              <TypeTagList types={analysis.weaknesses} emptyText="뚜렷한 약점이 없습니다." />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-blue-600 mb-2">내성</h3>
+              <TypeTagList types={analysis.resistances} emptyText="뚜렷한 내성이 없습니다." />
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* 점수 바 + 종합 점수 */}
-      <div className={`${UI.pageBg} ${UI.border} p-4`}>
-        <h2 className={UI.sectionTitle}>점수 상세</h2>
-        <div className="space-y-3 mb-4">
-          <ScoreBar label="공격 커버리지" score={analysis.offense_score} color="bg-indigo-500" />
-          <ScoreBar label="방어 밸런스" score={analysis.defense_score} color="bg-red-400" />
-          <ScoreBar label="타입 다양성" score={analysis.diversity_score} color="bg-emerald-500" />
-        </div>
+        {/* 오른쪽: 점수 바 + 종합 점수 */}
+        <div className={`${UI.pageBg} ${UI.border} p-4`}>
+          <h2 className={UI.sectionTitle}>점수 상세</h2>
+          <div className="space-y-3 mb-4">
+            <ScoreBar label="공격 커버리지" score={analysis.offense_score} color="bg-indigo-500" />
+            <ScoreBar label="방어 밸런스" score={analysis.defense_score} color="bg-red-400" />
+            <ScoreBar label="타입 다양성" score={analysis.diversity_score} color="bg-emerald-500" />
+          </div>
 
-        {/* 종합 점수 */}
-        <div className="pt-3 border-t border-slate-200 flex items-center justify-between">
-          <span className="text-sm font-medium text-slate-600">종합</span>
-          <span className={`text-lg font-bold ${getGradeColor(grade)}`}>
-            {grade}등급 ({Math.round(analysis.total_score)}점) · {getGradeLabel(grade)}
-          </span>
+          <div className="pt-3 border-t border-slate-200 flex items-center justify-between">
+            <span className="text-sm font-medium text-slate-600">종합</span>
+            <span className={`text-lg font-bold ${getGradeColor(grade)}`}>
+              {grade}등급 ({Math.round(analysis.total_score)}점)
+            </span>
+          </div>
         </div>
       </div>
 

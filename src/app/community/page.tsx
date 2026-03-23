@@ -1,8 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Loader2, Users } from 'lucide-react';
 import SharedPartyCard from '@/components/SharedPartyCard';
+import GalleryFilter from '@/components/GalleryFilter';
+import type { SortOption, GradeFilter } from '@/components/GalleryFilter';
 import type { SharedParty, SharedPartiesResponse } from '@/types/shared-party';
 import { UI } from '@/lib/ui-tokens';
 import { getClientErrorMessage } from '@/lib/error-utils';
@@ -43,6 +46,31 @@ function EmptyGallery() {
 }
 
 export default function CommunityPage() {
+  return (
+    <Suspense fallback={
+      <div className={`min-h-screen ${UI.pageBg} flex items-center justify-center`}>
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+      </div>
+    }>
+      <CommunityContent />
+    </Suspense>
+  );
+}
+
+function CommunityContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  // URL에서 초기값 읽기
+  const [sort, setSort] = useState<SortOption>(
+    (searchParams.get('sort') as SortOption) || 'recent'
+  );
+  const [search, setSearch] = useState(searchParams.get('q') || '');
+  const [grade, setGrade] = useState<GradeFilter>(
+    (searchParams.get('grade') as GradeFilter) || ''
+  );
+  const [gameId, setGameId] = useState(searchParams.get('game') || '');
+
   const [parties, setParties] = useState<SharedParty[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +79,18 @@ export default function CommunityPage() {
   const [loadingMore, setLoadingMore] = useState(false);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  // URL 쿼리 동기화
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (sort !== 'recent') params.set('sort', sort);
+    if (search) params.set('q', search);
+    if (grade) params.set('grade', grade);
+    if (gameId) params.set('game', gameId);
+    const qs = params.toString();
+    const newUrl = qs ? `/community?${qs}` : '/community';
+    router.replace(newUrl, { scroll: false });
+  }, [sort, search, grade, gameId, router]);
 
   const fetchParties = useCallback(async (pageNum: number) => {
     try {
@@ -61,7 +101,15 @@ export default function CommunityPage() {
       }
       setError(null);
 
-      const res = await fetch(`/api/shared?page=${pageNum}&limit=${PAGE_SIZE}`);
+      const params = new URLSearchParams();
+      params.set('page', String(pageNum));
+      params.set('limit', String(PAGE_SIZE));
+      if (sort !== 'recent') params.set('sort', sort);
+      if (search) params.set('q', search);
+      if (grade) params.set('grade', grade);
+      if (gameId) params.set('game', gameId);
+
+      const res = await fetch(`/api/shared?${params.toString()}`);
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || '갤러리를 불러올 수 없습니다.');
@@ -77,8 +125,9 @@ export default function CommunityPage() {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, []);
+  }, [sort, search, grade, gameId]);
 
+  // 필터/정렬 변경 시 page=1부터 다시 로드
   useEffect(() => {
     fetchParties(1);
   }, [fetchParties]);
@@ -93,12 +142,24 @@ export default function CommunityPage() {
     <div className={`min-h-screen ${UI.pageBg}`}>
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* 페이지 헤더 */}
-        <div className="mb-8">
+        <div className="mb-6">
           <h1 className="text-2xl font-bold text-slate-900 mb-1">커뮤니티 갤러리</h1>
           <p className="text-sm text-slate-500">
             다른 트레이너들이 공유한 파티를 구경해보세요
           </p>
         </div>
+
+        {/* 필터 바 */}
+        <GalleryFilter
+          sort={sort}
+          onSortChange={setSort}
+          search={search}
+          onSearchChange={setSearch}
+          grade={grade}
+          onGradeChange={setGrade}
+          gameId={gameId}
+          onGameChange={setGameId}
+        />
 
         {/* 에러 표시 */}
         {error && (
@@ -139,7 +200,6 @@ export default function CommunityPage() {
                 {/* 페이지 번호 */}
                 {Array.from({ length: totalPages }, (_, i) => i + 1)
                   .filter((p) => {
-                    // 현재 페이지 주변 2개 + 처음/끝 표시
                     return p === 1 || p === totalPages || Math.abs(p - page) <= 2;
                   })
                   .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {

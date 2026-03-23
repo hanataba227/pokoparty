@@ -106,6 +106,17 @@ function getGradeFromScore(score: number): PartyGrade {
   return "D";
 }
 
+/** 등급 라벨 (한글) */
+export function getGradeLabel(grade: PartyGrade): string {
+  switch (grade) {
+    case "S": return "S등급";
+    case "A": return "A등급";
+    case "B": return "B등급";
+    case "C": return "C등급";
+    case "D": return "D등급";
+  }
+}
+
 /** 등급별 텍스트 색상 (Tailwind) */
 export function getGradeColor(grade: PartyGrade): string {
   switch (grade) {
@@ -117,16 +128,6 @@ export function getGradeColor(grade: PartyGrade): string {
   }
 }
 
-/** 등급별 한국어 라벨 */
-export function getGradeLabel(grade: PartyGrade): string {
-  switch (grade) {
-    case "S": return "완벽";
-    case "A": return "우수";
-    case "B": return "양호";
-    case "C": return "보통";
-    case "D": return "부족";
-  }
-}
 
 /** 등급별 배경색 (Tailwind) */
 export function getGradeBgColor(grade: PartyGrade): string {

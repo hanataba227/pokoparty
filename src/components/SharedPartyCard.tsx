@@ -7,6 +7,7 @@ import { getSpriteUrl } from '@/lib/sprite';
 import { UI } from '@/lib/ui-tokens';
 import { getGradeColor, getGradeBgColor } from '@/lib/party-grade';
 import { getGameById } from '@/lib/game-data';
+import LikeButton from '@/components/LikeButton';
 
 interface SharedPartyCardProps {
   party: SharedParty;
@@ -88,8 +89,14 @@ export default function SharedPartyCard({ party }: SharedPartyCardProps) {
         </p>
       )}
 
-      {/* 하단: 등급 + 점수 */}
-      <div className="flex items-center justify-end">
+      {/* 하단: 좋아요 + 등급 + 점수 */}
+      <div className="flex items-center justify-between">
+        <LikeButton
+          sharedPartyId={party.id}
+          initialLiked={party.is_liked === true}
+          initialCount={party.like_count ?? 0}
+          compact
+        />
         <span className={`${getGradeBgColor(grade)} ${getGradeColor(grade)} px-2 py-1 rounded-lg text-sm font-bold`}>
           {grade}등급 {Math.round(party.total_score)}점
         </span>

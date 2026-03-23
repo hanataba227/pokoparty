@@ -8,11 +8,14 @@ import { getGradeColor, getGradeLabel, getGradeBgColor } from '@/lib/party-grade
 import { getClientErrorMessage } from '@/lib/error-utils';
 import PartySlot from '@/components/PartySlot';
 import PokemonSearchModal from '@/components/PokemonSearchModal';
+import GameSelect from '@/components/GameSelect';
+import SavePartyModal from '@/components/SavePartyModal';
 import TypeBadge from '@/components/TypeBadge';
-import { Loader2, BarChart3, Shield, Swords, AlertTriangle, FolderOpen, Lightbulb } from 'lucide-react';
+import { Loader2, BarChart3, Shield, Swords, AlertTriangle, FolderOpen, Lightbulb, Save } from 'lucide-react';
 import { UI } from '@/lib/ui-tokens';
 import { cachedFetch } from '@/lib/client-cache';
 import { useAuth } from '@/contexts/AuthContext';
+import { getGameById } from '@/lib/game-data';
 
 /** 종합 점수 등급 색상 */
 function getScoreColor(score: number): string {
@@ -61,6 +64,11 @@ function AnalyzeContent() {
   const [partyListOpen, setPartyListOpen] = useState(false);
   const [partyLoading, setPartyLoading] = useState(false);
   const [partyLoadError, setPartyLoadError] = useState<string | null>(null);
+
+  const [selectedGameId, setSelectedGameId] = useState('');
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const autoAnalyzeDone = useRef(false);
   const partyListRef = useRef<HTMLDivElement>(null);
@@ -180,6 +188,39 @@ function AnalyzeContent() {
     setAnalyzeError(null);
   }, [pokemonMap]);
 
+  const handleGameChange = useCallback((gameId: string) => {
+    setSelectedGameId(gameId);
+    setAnalysis(null);
+    setAnalyzeError(null);
+  }, []);
+
+  const handleSaveParty = useCallback(async (name: string) => {
+    const pokemonIds = party.filter((p): p is Pokemon => p !== null).map((p) => p.id);
+    if (pokemonIds.length === 0 || !selectedGameId) return;
+    try {
+      setSaving(true);
+      setSaveError(null);
+      const res = await fetch('/api/parties', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          pokemon_ids: pokemonIds,
+          game_id: selectedGameId,
+        }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || '파티 저장에 실패했습니다.');
+      }
+      setSaveModalOpen(false);
+    } catch (err) {
+      setSaveError(getClientErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }, [party, selectedGameId]);
+
   const selectedCount = party.filter((p) => p !== null).length;
 
   const handleAnalyze = useCallback(async () => {
@@ -193,7 +234,7 @@ function AnalyzeContent() {
       const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pokemonIds }),
+        body: JSON.stringify({ pokemonIds, gameId: selectedGameId || undefined }),
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
@@ -206,7 +247,7 @@ function AnalyzeContent() {
     } finally {
       setAnalyzing(false);
     }
-  }, [party]);
+  }, [party, selectedGameId]);
 
   useEffect(() => {
     if (shouldAutoAnalyze) {
@@ -237,6 +278,15 @@ function AnalyzeContent() {
               파티 구성
             </h2>
 
+            <div className="flex items-center gap-3">
+              {/* 게임(세대) 선택 */}
+              <GameSelect
+                value={selectedGameId}
+                onChange={handleGameChange}
+                disabled={pokemonLoading}
+                className="!w-36 !py-2 !px-3 !pr-7 !rounded-xl !border !border-slate-300 !bg-white !font-medium !text-sm !text-slate-600"
+              />
+
             {/* 내 파티 가져오기 — 오른쪽 상단 */}
             {user && (
               <div className="relative" ref={partyListRef}>
@@ -244,10 +294,10 @@ function AnalyzeContent() {
                   onClick={handleLoadMyParties}
                   disabled={partyLoading || pokemonLoading}
                   className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl
-                    border-2 font-medium text-sm
+                    border border-slate-300 bg-white font-medium text-sm
                     ${partyListOpen
                       ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                      : `${UI.border} text-slate-600 hover:border-indigo-300 hover:text-indigo-600`
+                      : 'text-slate-600 hover:border-indigo-300 hover:text-indigo-600'
                     }
                     disabled:opacity-50 disabled:cursor-not-allowed
                     transition-colors duration-200 cursor-pointer
@@ -255,9 +305,7 @@ function AnalyzeContent() {
                 >
                   {partyLoading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <FolderOpen className="w-4 h-4" />
-                  )}
+                  ) : null}
                   내 파티 가져오기
                 </button>
 
@@ -302,6 +350,7 @@ function AnalyzeContent() {
                 )}
               </div>
             )}
+            </div>
           </div>
 
           {pokemonError && (
@@ -323,11 +372,11 @@ function AnalyzeContent() {
             ))}
           </div>
 
-          {/* 분석하기 버튼 */}
-          <div className="mt-6 flex justify-center">
+          {/* 분석하기 + 파티 저장 버튼 */}
+          <div className="mt-6 flex justify-center gap-3">
             <button
               onClick={handleAnalyze}
-              disabled={selectedCount < 1 || analyzing || pokemonLoading}
+              disabled={selectedCount < 1 || !selectedGameId || analyzing || pokemonLoading}
               className="inline-flex items-center gap-2 px-8 py-3 rounded-xl
                 bg-indigo-600 text-white font-semibold text-base
                 hover:bg-indigo-700 active:bg-indigo-800
@@ -347,7 +396,28 @@ function AnalyzeContent() {
                 </>
               )}
             </button>
+
+            {user && analysis && (
+              <button
+                onClick={() => setSaveModalOpen(true)}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl
+                  border-2 border-indigo-500 text-indigo-600 font-semibold text-base
+                  hover:bg-indigo-50
+                  transition-colors duration-200 cursor-pointer
+                  focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+              >
+                <Save className="w-5 h-5" />
+                파티 저장
+              </button>
+            )}
           </div>
+
+          {/* 저장 에러 */}
+          {saveError && (
+            <div className="mt-3 text-center text-sm text-red-600">
+              {saveError}
+            </div>
+          )}
         </div>
 
         {/* 분석 에러 */}
@@ -543,6 +613,20 @@ function AnalyzeContent() {
             )}
           </div>
         )}
+
+        {/* 파티 저장 모달 */}
+        <SavePartyModal
+          isOpen={saveModalOpen}
+          onClose={() => setSaveModalOpen(false)}
+          onSave={handleSaveParty}
+          pokemonCount={selectedCount}
+          selectedGameId={selectedGameId}
+          gameName={(() => {
+            const game = getGameById(selectedGameId);
+            return game ? `${game.label} (${game.generation}세대)` : selectedGameId;
+          })()}
+          saving={saving}
+        />
 
         {/* 포켓몬 검색 모달 */}
         <PokemonSearchModal
