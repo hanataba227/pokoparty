@@ -153,7 +153,7 @@ export default function PartyDetailPage() {
           {data && !showDeleteConfirm && (
             <button
               onClick={() => setShowDeleteConfirm(true)}
-              className="inline-flex items-center gap-1.5 text-sm text-red-600 hover:text-red-700 transition-colors cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 text-sm text-red-600 hover:text-red-700 transition-colors cursor-pointer min-w-[4.5rem]"
             >
               <Trash2 className="w-4 h-4" />
               삭제

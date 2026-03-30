@@ -166,7 +166,7 @@ export default function PartyDetailHeader({
         </div>
 
         {grade && (
-          <div className={`${getGradeBgColor(grade as PartyGrade)} ${getGradeColor(grade as PartyGrade)} px-3 py-2 rounded-xl text-center flex-shrink-0`}>
+          <div className={`${getGradeBgColor(grade as PartyGrade)} ${getGradeColor(grade as PartyGrade)} px-3 py-2 rounded-xl text-center flex-shrink-0 min-w-[4.5rem]`}>
             <div className="text-2xl font-black leading-none">{grade}</div>
             {totalScore !== undefined && (
               <div className="text-xs opacity-75 mt-1">{totalScore}점 · {getGradeLabel(grade as PartyGrade)}</div>
